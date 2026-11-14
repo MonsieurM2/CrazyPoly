@@ -373,6 +373,7 @@ impl Game {
         if self.phase != Phase::Roll {
             return;
         }
+        sfx(Sfx::Dice);
         let p = self.turn;
         // Roll with the physics engine: the values are whatever faces ended up
         // pointing at the sky, and the recorded poses drive the animation.
@@ -626,6 +627,7 @@ impl Game {
     pub fn send_to_jail(&mut self, p: usize) {
         self.players[p].pos = JAIL_POS;
         self.players[p].in_jail = true;
+        sfx(Sfx::Jail);
         self.players[p].jail_turns = 0;
         self.rolled_double = false;
         self.pending_mod = LandingMod::Normal;
@@ -652,6 +654,7 @@ impl Game {
         };
         self.log(format!("{} - {}", deck_name, card.text()));
         self.banner = Some((card.text().to_string(), 5.0));
+        sfx(Sfx::Card);
         self.apply_card(card);
     }
 
@@ -776,6 +779,7 @@ impl Game {
         self.players[p].cash -= price;
         self.props[pos].owner = Some(p);
         self.props[pos].mortgaged = false;
+        sfx(Sfx::Buy);
         let name = self.spaces[pos].name;
         self.log(crate::tr!(
             "{} buys {} for ${}.",
@@ -921,6 +925,7 @@ impl Game {
             return;
         }
         if self.players[from].cash >= amount {
+            sfx(Sfx::Cash);
             self.players[from].cash -= amount;
             if let Some(t) = to {
                 self.players[t].cash += amount;
@@ -945,6 +950,7 @@ impl Game {
                 resume,
             });
             self.phase = Phase::Debt;
+            sfx(Sfx::Bad);
         }
     }
 
@@ -962,6 +968,7 @@ impl Game {
             return;
         }
         self.players[p].cash -= d.amount;
+        sfx(Sfx::Cash);
         if let Some(c) = d.creditor {
             self.players[c].cash += d.amount;
         }
@@ -1100,6 +1107,7 @@ impl Game {
             return false;
         }
         self.players[p].cash -= cost;
+        sfx(Sfx::Build);
         let h = self.props[tile].houses;
         if h == 4 {
             self.props[tile].houses = 5;
@@ -1589,6 +1597,7 @@ impl Game {
         self.winner = winner;
         self.phase = Phase::Over;
         self.anim = None;
+        sfx(Sfx::Win);
         if let Some(w) = winner {
             let name = self.pname(w);
             self.log(crate::tr!(
@@ -1636,6 +1645,7 @@ impl Game {
                 if a.idx + 1 < a.path.len() {
                     a.idx += 1;
                     a.t -= 1.0;
+                    sfx(Sfx::Step);
                 } else {
                     a.t = 0.0;
                     arrived = true;
@@ -1685,3 +1695,11 @@ impl Game {
 
 
 
+
+
+/// Play one of the game's sound effects (a no-op when audio is unavailable).
+fn sfx(kind: Sfx) {
+    crate::audio::sfx(kind);
+}
+
+use crate::audio::Sfx;

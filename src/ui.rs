@@ -362,7 +362,11 @@ fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
         let fg = if enabled { CREAM } else { Color { r: 0.357, g: 0.435, b: 0.376, a: 1.0 } };
         draw_raw(&label, tx, ty, size, fg, true);
     }
-    enabled && hover && is_mouse_button_pressed(MouseButton::Left)
+    let clicked = enabled && hover && is_mouse_button_pressed(MouseButton::Left);
+    if clicked {
+        crate::audio::sfx(crate::audio::Sfx::Click);
+    }
+    clicked
 }
 
 fn small_button(r: Rect, label: &str, enabled: bool) -> bool {
@@ -382,7 +386,74 @@ fn small_button(r: Rect, label: &str, enabled: bool) -> bool {
     );
     let size = (r.h * 0.55).clamp(9.0, 15.0);
     centered(label, r.x + r.w * 0.5, r.y + r.h * 0.5, size, if enabled { CREAM } else { MUTED });
-    enabled && hover && is_mouse_button_pressed(MouseButton::Left)
+    let clicked = enabled && hover && is_mouse_button_pressed(MouseButton::Left);
+    if clicked {
+        crate::audio::sfx(crate::audio::Sfx::Click);
+    }
+    clicked
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Icon {
+    Music,
+    Sfx,
+}
+
+/// Square icon button for the music and the sound effects: a note and an
+/// equaliser, struck through when the channel is off.
+fn sound_button(r: Rect, icon: Icon, on: bool) -> bool {
+    let (mx, my) = mouse_position();
+    let hover = inr(r, mx, my);
+    if hover {
+        round_rect(
+            r.x,
+            r.y,
+            r.w,
+            r.h,
+            8.0,
+            Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 },
+        );
+    }
+    round_outline(
+        r.x,
+        r.y,
+        r.w,
+        r.h,
+        8.0,
+        1.0,
+        if on {
+            GOLD_DIM
+        } else {
+            Color { r: 0.153, g: 0.251, b: 0.204, a: 1.0 }
+        },
+    );
+    let c = if on { GOLD_SOFT } else { MUTED };
+    let cx = r.x + r.w * 0.5;
+    let cy = r.y + r.h * 0.5;
+    match icon {
+        Icon::Music => {
+            draw_rectangle(cx - 1.2, cy - 7.0, 1.8, 11.0, c);
+            draw_rectangle(cx + 0.4, cy - 7.0, 5.2, 2.0, c);
+            draw_circle(cx - 3.6, cy + 4.4, 3.2, c);
+        }
+        Icon::Sfx => {
+            for (k, h) in [7.0f32, 12.0, 9.0].iter().enumerate() {
+                let hh = if on { *h } else { 4.0 };
+                round_rect(
+                    cx - 7.4 + k as f32 * 5.0,
+                    cy - hh * 0.5,
+                    2.6,
+                    hh,
+                    1.2,
+                    c,
+                );
+            }
+        }
+    }
+    if !on {
+        draw_line(cx - 8.0, cy + 8.0, cx + 8.0, cy - 8.0, 1.5, MUTED);
+    }
+    hover && is_mouse_button_pressed(MouseButton::Left)
 }
 
 fn modal_rect(w: f32, h: f32) -> Rect {
@@ -544,6 +615,24 @@ fn draw_setup(app: &mut App) {
     );
     if !picker_open && button(Rect::new(x + w - 70.0, y + 14.0, 54.0, 30.0), i18n::code(), true, false) {
         i18n::toggle();
+    }
+    if !picker_open
+        && sound_button(
+            Rect::new(x + w - 114.0, y + 14.0, 34.0, 30.0),
+            Icon::Music,
+            crate::audio::music_on(),
+        )
+    {
+        crate::audio::toggle_music();
+    }
+    if !picker_open
+        && sound_button(
+            Rect::new(x + w - 156.0, y + 14.0, 34.0, 30.0),
+            Icon::Sfx,
+            crate::audio::sfx_on(),
+        )
+    {
+        crate::audio::toggle_sfx();
     }
 
     // player count
@@ -1687,13 +1776,23 @@ fn draw_left_column(g: &Game, lay: &Layout) {
         );
     }
 
-    if button(
-        Rect::new(p.x, p.y + p.h - 30.0, 64.0, 28.0),
-        i18n::code(),
-        true,
-        false,
-    ) {
+    let bar = p.y + p.h - 30.0;
+    if button(Rect::new(p.x, bar, 64.0, 28.0), i18n::code(), true, false) {
         i18n::toggle();
+    }
+    if sound_button(
+        Rect::new(p.x + 72.0, bar, 34.0, 28.0),
+        Icon::Sfx,
+        crate::audio::sfx_on(),
+    ) {
+        crate::audio::toggle_sfx();
+    }
+    if sound_button(
+        Rect::new(p.x + 112.0, bar, 34.0, 28.0),
+        Icon::Music,
+        crate::audio::music_on(),
+    ) {
+        crate::audio::toggle_music();
     }
 }
 

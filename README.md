@@ -5,7 +5,8 @@ built with [`macroquad`](https://github.com/not-fl3/macroquad). The board and th
 pieces are drawn with primitives at runtime, so the whole game is a handful of
 `src` files; the only assets are two bundled fonts, [Lato](https://fonts.google.com/specimen/Lato)
 for body text and [Playfair Display](https://fonts.google.com/specimen/Playfair+Display)
-for the titles (both SIL Open Font License).
+for the titles (both SIL Open Font License), plus the soundtrack and the sound
+effects, all synthesised from scratch for this game (see **Sound** below).
 
 Base repository: <https://github.com/crazypoly/crazypoly>
 
@@ -60,6 +61,13 @@ right-hand column, and the log follows every move in the players' colours:
   keeping the face they landed on, ready for the next roll.
 - **Eight token designs** (car, top hat, dog, boot, ship, cat, plane, diamond)
   drawn with primitives - pick one for each seat on the setup screen.
+- **Music and sound effects**, all original and royalty-free: a laid-back
+  salon loop (electric piano, bass, brushed ride, small room reverb) under the
+  whole game, plus dice tumbling, a step per space, coins, a purchase chord, a
+  card swoosh, the jail clank, a hammer for houses, a low buzz for debts and a
+  short fanfare when someone wins. Two icon buttons - an equaliser for the
+  effects and a note for the music - turn either channel off at any time, on the
+  setup screen and in the left column of the board.
 - Animated token movement, hover tooltips on every tile, live game log.
 - A **three-column layout** that fills the window: the square board in the middle,
   the players and the bank on the left, the current instruction, the action
@@ -80,6 +88,21 @@ each one is the result (`3 + 6 = 9` here). Once they have stopped they hop back
 to their home spots, still showing the face they landed on:
 
 ![Dice in flight](docs/throw.png)
+
+## Sound
+
+The music and the eleven effects are **original**: `make_audio.py` renders them
+from sines, filtered noise and a small Schroeder reverb, so nothing here is
+borrowed and there is no licence to check. The WAVs are compiled into the
+executable with `include_bytes!`, so the game still ships as a single file.
+
+- The loop starts on the setup screen and runs through the whole game.
+- The note button mutes the music, the equaliser button mutes the effects; both
+  icons are struck through when their channel is off.
+- No audio device (or a failed load) simply means a silent game - nothing else
+  depends on it.
+- To tweak the sound, edit `make_audio.py` and run `python make_audio.py`, then
+  rebuild.
 
 ## Requirements
 
@@ -166,7 +189,9 @@ Cargo.toml
 assets/
   Lato-Regular.ttf, Lato-Bold.ttf   bundled UI fonts (SIL OFL, see OFL.txt)
   PlayfairDisplay.ttf               titles (SIL OFL, see OFL-Playfair.txt)
+  audio/                            music + effects (WAV, generated, see Sound)
 src/
+  audio.rs   music and effects: embedded WAVs, one-shot playback, the two toggles
   main.rs    window setup, app state, frame loop
   board.rs   static board data (names, groups, prices, rent tables)
   cards.rs   bilingual Chance / Community Chest decks
@@ -179,6 +204,9 @@ src/
   persist.rs save/load (JSON, one slot)
   ui.rs      green table look: felt, wood-framed board, gold accents, three columns
 ```
+
+`make_audio.py` at the top of the repository regenerates every file in
+`assets/audio/` (it needs nothing but plain Python 3).
 
 ## Rule notes
 

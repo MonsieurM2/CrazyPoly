@@ -22,6 +22,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ai;
+mod audio;
 mod board;
 mod cards;
 mod dice;
@@ -64,6 +65,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     ui::load_fonts();
+    audio::load().await;
     macroquad::rand::srand(
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

@@ -6,7 +6,7 @@ description = "A faithful top-down recreation of the classic Monopoly board game
 license = "MIT"
 
 [dependencies]
-macroquad = "0.4"
+macroquad = { version = "0.4", features = ["audio"] }
 rapier3d = "0.36"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
