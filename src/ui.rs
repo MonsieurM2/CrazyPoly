@@ -2402,8 +2402,9 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
     let start = ui.asset_page * per_page;
     let slice: Vec<usize> = tiles.iter().skip(start).take(per_page).copied().collect();
 
-    let rows_used = (((slice.len().max(1) + 1) / 2).min(8)) as f32;
-    let r = modal_rect(820.0, (270.0 + rows_used * 48.0).max(320.0));
+    // Eight lots per column, so the window grows with the longest column.
+    let rows_used = slice.len().clamp(1, 8) as f32;
+    let r = modal_rect(820.0, (256.0 + rows_used * 48.0).max(320.0));
     let title = crate::tr!("BUILD & MORTGAGE - {}", "CONSTRUIRE & HYPOTHÉQUER - {}", name);
     let content = modal_shell(r, &title);
     txt(

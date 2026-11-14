@@ -89,6 +89,22 @@ to their home spots, still showing the face they landed on:
 
 ![Dice in flight](docs/throw.png)
 
+Everything the board cannot show has its own window: building, selling and
+mortgaging, trading properties for cash, auctions, debts, the final ranking and
+the token picker.
+
+| Build, sell, mortgage | Trade lots for cash |
+| --- | --- |
+| ![The assets window](docs/assets.png) | ![The trade window](docs/trade.png) |
+
+| Auctions | Debt and bankruptcy |
+| --- | --- |
+| ![An auction](docs/auction.png) | ![A debt to settle](docs/debt.png) |
+
+| Eight token designs | The final ranking |
+| --- | --- |
+| ![Choosing a token](docs/tokens.png) | ![Game over](docs/over.png) |
+
 ## Sound
 
 The music and the eleven effects are **original**: `make_audio.py` renders them
