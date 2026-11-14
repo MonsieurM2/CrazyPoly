@@ -3,10 +3,14 @@
 A pixel-faithful, top-down recreation of the classic Monopoly board game in Rust,
 built with [`macroquad`](https://github.com/not-fl3/macroquad). The board and the
 pieces are drawn with primitives at runtime, so the whole game is a handful of
-`.rs` files; the only asset is the bundled [Lato](https://fonts.google.com/specimen/Lato)
-font (SIL Open Font License) used for readable, accented text.
+`src` files; the only assets are two bundled fonts, [Lato](https://fonts.google.com/specimen/Lato)
+for body text and [Playfair Display](https://fonts.google.com/specimen/Playfair+Display)
+for the titles (both SIL Open Font License).
 
 Base repository: <https://github.com/crazypoly/crazypoly>
+
+A property is offered: the deed floats over the board, the decision sits in the
+right-hand column, and the log follows every move in the players' colours:
 
 ![CrazyPoly in play](docs/board.png)
 
@@ -37,7 +41,7 @@ Base repository: <https://github.com/crazypoly/crazypoly>
     or declare bankruptcy; assets pass to the creditor (or the bank) and the
     last solvent player wins
 - **French and English** interface, switchable at any time with the **FR / EN**
-  button on the setup screen and in the game panel. French is the default; street
+  button under the player list and on the setup screen. French is the default; street
   names stay in English to match the classic board.
 - Bots buy, bid, build, raise cash and answer trade offers on their own. They also
   **start trades**: when a bot holds two lots of a colour group it offers cash for
@@ -57,8 +61,12 @@ Base repository: <https://github.com/crazypoly/crazypoly>
 - **Eight token designs** (car, top hat, dog, boot, ship, cat, plane, diamond)
   drawn with primitives - pick one for each seat on the setup screen.
 - Animated token movement, hover tooltips on every tile, live game log.
-- A layout that fills the window: the square board is sized to the window height
-  and the side panel absorbs the remaining width (scaled fonts, no dead space).
+- A **three-column layout** that fills the window: the square board in the middle,
+  the players and the bank on the left, the current instruction, the action
+  buttons and the game log on the right. Buying is decided right there - the
+  prompt reads *"Vermont Avenue is free"*, the buttons offer **BUY** or **PASS**
+  (which opens the auction), and the property's **title deed** floats over the
+  board with its full rent table, so the price is visible before you commit.
 
 ## Screenshots
 
@@ -68,12 +76,10 @@ and the FR / EN switch:
 ![Setup screen](docs/setup.png)
 
 A throw in progress: the cubes tumble, bounce and land, and the upper face of
-each one is the result (`6 + 4 = 10` here). Once they have stopped they hop back
+each one is the result (`3 + 6 = 9` here). Once they have stopped they hop back
 to their home spots, still showing the face they landed on:
 
-| Mid-throw | At rest |
-| --- | --- |
-| ![Dice in flight](docs/throw.png) | ![Dice at rest](docs/dice.png) |
+![Dice in flight](docs/throw.png)
 
 ## Requirements
 
@@ -113,7 +119,7 @@ cp target/release/crazypoly.exe dist/CrazyPoly.exe
 
 ## Saving and loading
 
-- **SAVE** in the side panel writes the current game at the start or end of your
+- **SAVE** in the right-hand column writes the current game at the start or end of your
   turn (it is disabled while dice are moving, a card is being resolved, or an
   auction/debt dialog is open).
 - On the setup screen, **CONTINUE GAME** resumes the saved game. It is disabled
@@ -133,7 +139,8 @@ cp target/release/crazypoly.exe dist/CrazyPoly.exe
    game plays itself, which is handy to watch the AI (and the dice) at work.
 2. Press **START GAME**.
 3. On your turn press **ROLL DICE**. Your token walks around the board.
-4. When you land on an unowned property, choose **BUY** or **AUCTION IT**.
+4. When you land on an unowned property, choose **BUY** or **PASS** (which puts
+   the lot up for auction); the deed floating over the board shows every rent.
 5. Use **BUILD / MORTGAGE** to add houses and hotels, or to raise cash;
    **TRADE** opens the trade window; **END TURN** passes play on.
 6. If you owe more cash than you hold, the debt dialog appears: sell buildings,
@@ -145,8 +152,8 @@ records everything that happens.
 
 ## Language
 
-French is the default. Press the **FR / EN** button in the top-right corner of the
-setup screen or of the in-game panel to switch instantly - labels, tooltips, cards,
+French is the default. Press the **FR / EN** button under the player list, or the
+one on the setup screen, to switch instantly - labels, tooltips, cards,
 buttons and every log message follow the active language. All strings live in
 two places: `src/i18n.rs` (`t("English", "Français")` and the `tr!` macro for
 formatted messages) and the bilingual card texts in `src/cards.rs`, so adding a
@@ -158,6 +165,7 @@ language only touches those two modules.
 Cargo.toml
 assets/
   Lato-Regular.ttf, Lato-Bold.ttf   bundled UI fonts (SIL OFL, see OFL.txt)
+  PlayfairDisplay.ttf               titles (SIL OFL, see OFL-Playfair.txt)
 src/
   main.rs    window setup, app state, frame loop
   board.rs   static board data (names, groups, prices, rent tables)
@@ -169,7 +177,7 @@ src/
   dice_physics.rs   the throw itself: rapier3d world, recorded poses, face read-out
   tokens.rs  the eight player token designs, drawn with primitives
   persist.rs save/load (JSON, one slot)
-  ui.rs      rendering, layout and input for board, panel and modals
+  ui.rs      green table look: felt, wood-framed board, gold accents, three columns
 ```
 
 ## Rule notes

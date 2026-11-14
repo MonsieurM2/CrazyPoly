@@ -17,45 +17,65 @@ use crate::{App, Screen};
 pub use crate::game::PLAYER_COLORS as TOKENS;
 
 // ------------------------------------------------------------------ palette
+//
+// The whole game sits on a dark green felt table, with cream cards, gold
+// lettering and one wine red accent, like a deluxe edition of the board game.
 
-const BG: Color = Color { r: 0.065, g: 0.07, b: 0.085, a: 1.0 };
-const PANEL_BG: Color = Color { r: 0.115, g: 0.125, b: 0.15, a: 1.0 };
-const MODAL_BG: Color = Color { r: 0.145, g: 0.155, b: 0.185, a: 1.0 };
-const MODAL_HEADER: Color = Color { r: 0.19, g: 0.20, b: 0.24, a: 1.0 };
-const PANEL_EDGE: Color = Color { r: 0.30, g: 0.32, b: 0.37, a: 1.0 };
-const TEXT: Color = Color { r: 0.97, g: 0.96, b: 0.93, a: 1.0 };
-const TEXT_DIM: Color = Color { r: 0.78, g: 0.79, b: 0.82, a: 1.0 };
-const MUTED: Color = Color { r: 0.62, g: 0.64, b: 0.69, a: 1.0 };
-const ACCENT: Color = Color { r: 0.88, g: 0.22, b: 0.23, a: 1.0 };
-const ACCENT_SOFT: Color = Color { r: 0.97, g: 0.68, b: 0.44, a: 1.0 };
-const WARN: Color = Color { r: 0.98, g: 0.76, b: 0.30, a: 1.0 };
-const BTN: Color = Color { r: 0.23, g: 0.25, b: 0.30, a: 1.0 };
-const BTN_HOVER: Color = Color { r: 0.32, g: 0.35, b: 0.41, a: 1.0 };
-const BTN_OFF: Color = Color { r: 0.145, g: 0.155, b: 0.18, a: 1.0 };
-const BOARD_BG: Color = Color { r: 0.90, g: 0.885, b: 0.84, a: 1.0 };
-const CENTER_BG: Color = Color { r: 0.94, g: 0.925, b: 0.88, a: 1.0 };
-const TILE: Color = Color { r: 0.975, g: 0.965, b: 0.935, a: 1.0 };
-const INK: Color = Color { r: 0.09, g: 0.09, b: 0.09, a: 1.0 };
-const INK_SOFT: Color = Color { r: 0.30, g: 0.29, b: 0.27, a: 1.0 };
-const INK_LINE: Color = Color { r: 0.20, g: 0.20, b: 0.19, a: 1.0 };
-const ROW_BG: Color = Color { r: 0.18, g: 0.19, b: 0.225, a: 1.0 };
-const HOUSE_COL: Color = Color { r: 0.07, g: 0.58, b: 0.26, a: 1.0 };
-const HOTEL_COL: Color = Color { r: 0.80, g: 0.12, b: 0.12, a: 1.0 };
-const HOVER: Color = Color { r: 1.0, g: 1.0, b: 0.60, a: 0.33 };
+const BG_DEEP: Color = Color { r: 0.035, g: 0.110, b: 0.086, a: 1.0 };
+const BG_LIGHT: Color = Color { r: 0.086, g: 0.216, b: 0.165, a: 1.0 };
+const CARD: Color = Color { r: 0.063, g: 0.176, b: 0.133, a: 1.0 };
+const CARD_SOFT: Color = Color { r: 0.086, g: 0.216, b: 0.165, a: 1.0 };
+const CARD_EDGE: Color = Color { r: 0.216, g: 0.384, b: 0.302, a: 1.0 };
+const GOLD: Color = Color { r: 0.851, g: 0.643, b: 0.251, a: 1.0 };
+const GOLD_SOFT: Color = Color { r: 0.945, g: 0.835, b: 0.588, a: 1.0 };
+const GOLD_DIM: Color = Color { r: 0.694, g: 0.529, b: 0.247, a: 1.0 };
+const WINE: Color = Color { r: 0.545, g: 0.114, b: 0.114, a: 1.0 };
+const WOOD: Color = Color { r: 0.396, g: 0.267, b: 0.161, a: 1.0 };
+const WOOD_EDGE: Color = Color { r: 0.263, g: 0.169, b: 0.094, a: 1.0 };
+const CREAM: Color = Color { r: 0.961, g: 0.929, b: 0.855, a: 1.0 };
+const CREAM_DIM: Color = Color { r: 0.804, g: 0.776, b: 0.694, a: 1.0 };
+const DIM_GREEN: Color = Color { r: 0.639, g: 0.678, b: 0.635, a: 1.0 };
+
+// Names kept for the rest of the module.
+const PANEL_BG: Color = CARD;
+const MODAL_BG: Color = CARD;
+const MODAL_HEADER: Color = CARD_SOFT;
+const PANEL_EDGE: Color = CARD_EDGE;
+const TEXT: Color = CREAM;
+const TEXT_DIM: Color = CREAM_DIM;
+const MUTED: Color = DIM_GREEN;
+const ACCENT: Color = GOLD;
+const ACCENT_SOFT: Color = GOLD_SOFT;
+const WARN: Color = Color { r: 0.949, g: 0.706, b: 0.302, a: 1.0 };
+const BTN: Color = CARD_SOFT;
+const BTN_HOVER: Color = Color { r: 0.117, g: 0.278, b: 0.212, a: 1.0 };
+const BTN_OFF: Color = Color { r: 0.051, g: 0.141, b: 0.106, a: 1.0 };
+const BOARD_BG: Color = Color { r: 0.965, g: 0.937, b: 0.867, a: 1.0 };
+const CENTER_BG: Color = Color { r: 0.980, g: 0.957, b: 0.894, a: 1.0 };
+const TILE: Color = Color { r: 0.988, g: 0.973, b: 0.929, a: 1.0 };
+const INK: Color = Color { r: 0.106, g: 0.235, b: 0.180, a: 1.0 };
+const INK_SOFT: Color = Color { r: 0.502, g: 0.388, b: 0.235, a: 1.0 };
+const INK_LINE: Color = Color { r: 0.812, g: 0.769, b: 0.675, a: 1.0 };
+const ROW_BG: Color = CARD_SOFT;
+const HOUSE_COL: Color = Color { r: 0.09, g: 0.451, b: 0.259, a: 1.0 };
+const HOTEL_COL: Color = Color { r: 0.545, g: 0.114, b: 0.114, a: 1.0 };
+const HOVER: Color = Color { r: 0.851, g: 0.643, b: 0.251, a: 0.20 };
 const WHITE: Color = Color { r: 1.0, g: 1.0, b: 1.0, a: 1.0 };
-const SELECT: Color = Color { r: 0.20, g: 0.40, b: 0.26, a: 1.0 };
+const SELECT: Color = Color { r: 0.129, g: 0.310, b: 0.235, a: 1.0 };
 
 // -------------------------------------------------------------------- fonts
 
 thread_local! {
-    static FONTS: RefCell<(Option<Font>, Option<Font>)> = RefCell::new((None, None));
+    static FONTS: RefCell<(Option<Font>, Option<Font>, Option<Font>)> = RefCell::new((None, None, None));
 }
 
-/// Load the embedded Lato faces once the window exists.
+/// Load the embedded faces once the window exists: Lato for the interface and
+/// Playfair Display for the logo and the big headings.
 pub fn load_fonts() {
     let regular = load_ttf_font_from_bytes(&include_bytes!("../assets/Lato-Regular.ttf")[..]).ok();
     let bold = load_ttf_font_from_bytes(&include_bytes!("../assets/Lato-Bold.ttf")[..]).ok();
-    FONTS.with(|cell| *cell.borrow_mut() = (regular, bold));
+    let serif = load_ttf_font_from_bytes(&include_bytes!("../assets/PlayfairDisplay.ttf")[..]).ok();
+    FONTS.with(|cell| *cell.borrow_mut() = (regular, bold, serif));
 }
 
 fn font_size(size: f32) -> u16 {
@@ -68,6 +88,60 @@ fn with_font<R>(bold: bool, f: impl FnOnce(Option<&Font>) -> R) -> R {
         let font = if bold { borrow.1.as_ref() } else { borrow.0.as_ref() };
         f(font)
     })
+}
+
+fn with_serif<R>(f: impl FnOnce(Option<&Font>) -> R) -> R {
+    FONTS.with(|cell| f(cell.borrow().2.as_ref()))
+}
+
+fn serif(text: &str, x: f32, y: f32, size: f32, color: Color) {
+    with_serif(|font| {
+        let params = TextParams {
+            font,
+            font_size: font_size(size),
+            color,
+            ..Default::default()
+        };
+        draw_text_ex(text, x, y, params);
+    });
+}
+
+/// The bundled Playfair is a single weight: a hair of extra ink fakes the bold
+/// cut the design calls for.
+fn serif_bold(text: &str, x: f32, y: f32, size: f32, color: Color) {
+    serif(text, x, y, size, color);
+    serif(text, x + size * 0.013, y, size, color);
+}
+
+fn serif_w(text: &str, size: f32) -> f32 {
+    with_serif(|font| measure_text(text, font, font_size(size), 1.0).width)
+}
+
+fn serif_center(text: &str, cx: f32, cy: f32, size: f32, color: Color) {
+    with_serif(|font| {
+        let d = measure_text(text, font, font_size(size), 1.0);
+        let params = TextParams {
+            font,
+            font_size: font_size(size),
+            color,
+            ..Default::default()
+        };
+        draw_text_ex(text, cx - d.width * 0.5, cy + d.height * 0.34, params.clone());
+        draw_text_ex(
+            text,
+            cx - d.width * 0.5 + size * 0.013,
+            cy + d.height * 0.34,
+            params,
+        );
+    });
+}
+
+fn serif_left(text: &str, x: f32, baseline: f32, size: f32, color: Color) {
+    serif_bold(text, x, baseline, size, color);
+}
+
+fn serif_right(text: &str, right: f32, baseline: f32, size: f32, color: Color) {
+    serif_bold(text, right - serif_w(text, size) - size * 0.013, baseline, size, color);
 }
 
 fn measure(text: &str, size: f32, bold: bool) -> TextDimensions {
@@ -185,74 +259,130 @@ fn truncate(text: &str, max_w: f32, size: f32) -> String {
     format!("{}...", out)
 }
 
+// ------------------------------------------------------------------- shapes
+
+fn round_rect(x: f32, y: f32, w: f32, h: f32, r: f32, color: Color) {
+    let r = r.min(w * 0.5).min(h * 0.5).max(0.0);
+    if r < 1.0 {
+        draw_rectangle(x, y, w, h, color);
+        return;
+    }
+    draw_rectangle(x + r, y, w - 2.0 * r, h, color);
+    draw_rectangle(x, y + r, r, h - 2.0 * r, color);
+    draw_rectangle(x + w - r, y + r, r, h - 2.0 * r, color);
+    draw_circle(x + r, y + r, r, color);
+    draw_circle(x + w - r, y + r, r, color);
+    draw_circle(x + r, y + h - r, r, color);
+    draw_circle(x + w - r, y + h - r, r, color);
+}
+
+fn round_outline(x: f32, y: f32, w: f32, h: f32, r: f32, thickness: f32, color: Color) {
+    let r = r.min(w * 0.5).min(h * 0.5).max(0.0);
+    draw_line(x + r, y, x + w - r, y, thickness, color);
+    draw_line(x + r, y + h, x + w - r, y + h, thickness, color);
+    draw_line(x, y + r, x, y + h - r, thickness, color);
+    draw_line(x + w, y + r, x + w, y + h - r, thickness, color);
+    let corners = [
+        (x + r, y + r, std::f32::consts::PI),
+        (x + w - r, y + r, 1.5 * std::f32::consts::PI),
+        (x + w - r, y + h - r, 0.0),
+        (x + r, y + h - r, 0.5 * std::f32::consts::PI),
+    ];
+    for (cx, cy, a0) in corners {
+        let mut prev = (cx + r * a0.cos(), cy + r * a0.sin());
+        for k in 1..=6 {
+            let a = a0 + 0.5 * std::f32::consts::PI * k as f32 / 6.0;
+            let p = (cx + r * a.cos(), cy + r * a.sin());
+            draw_line(prev.0, prev.1, p.0, p.1, thickness, color);
+            prev = p;
+        }
+    }
+}
+
+fn round_card(x: f32, y: f32, w: f32, h: f32, r: f32, fill: Color, edge: Color) {
+    round_rect(x, y, w, h, r, edge);
+    round_rect(x + 1.0, y + 1.0, w - 2.0, h - 2.0, (r - 1.0).max(0.0), fill);
+}
+
+/// The felt table behind everything: a soft vertical gradient.
+fn felt_background() {
+    let h = screen_height();
+    let steps = 40;
+    let mut y = 0.0;
+    for k in 0..steps {
+        let t = k as f32 / (steps - 1) as f32;
+        let color = Color {
+            r: BG_DEEP.r + (BG_LIGHT.r - BG_DEEP.r) * t,
+            g: BG_DEEP.g + (BG_LIGHT.g - BG_DEEP.g) * t,
+            b: BG_DEEP.b + (BG_LIGHT.b - BG_DEEP.b) * t,
+            a: 1.0,
+        };
+        let next = (k + 1) as f32 * (h / steps as f32);
+        draw_rectangle(0.0, y, screen_width(), next - y + 1.0, color);
+        y = next;
+    }
+}
+
 fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let (mx, my) = mouse_position();
     let hover = enabled && inr(r, mx, my);
-    let bg = if !enabled {
-        BTN_OFF
-    } else if primary {
-        if hover {
-            Color { r: 0.97, g: 0.34, b: 0.32, a: 1.0 }
-        } else {
-            ACCENT
-        }
-    } else if hover {
-        BTN_HOVER
-    } else {
-        BTN
-    };
-    draw_rectangle(r.x, r.y, r.w, r.h, bg);
-    draw_rectangle_lines(r.x, r.y, r.w, r.h, 1.0, PANEL_EDGE);
-    let fg = if enabled { TEXT } else { Color { r: 0.45, g: 0.47, b: 0.51, a: 1.0 } };
-    let size = (r.h * 0.40).clamp(10.0, 17.0);
-    let label = truncate(label, r.w - 10.0, size);
+    let radius = (r.h * 0.30).min(12.0);
+    let size = (r.h * 0.36).clamp(10.0, 16.0);
+    let label = truncate(label, r.w - 16.0, size);
     let dims = measure(&label, size, true);
-    draw_raw(
-        &label,
-        r.x + (r.w - dims.width) * 0.5,
-        r.y + r.h * 0.5 + dims.height * 0.34,
-        size,
-        fg,
-        true,
-    );
+    let tx = r.x + (r.w - dims.width) * 0.5;
+    let ty = r.y + r.h * 0.5 + dims.height * 0.34;
+    if primary {
+        let fill = if !enabled {
+            Color { r: 0.235, g: 0.235, b: 0.161, a: 1.0 }
+        } else if hover {
+            GOLD_SOFT
+        } else {
+            GOLD
+        };
+        round_rect(r.x, r.y, r.w, r.h, radius, fill);
+        let fg = if enabled {
+            Color { r: 0.075, g: 0.157, b: 0.114, a: 1.0 }
+        } else {
+            Color { r: 0.545, g: 0.541, b: 0.451, a: 1.0 }
+        };
+        draw_raw(&label, tx, ty, size, fg, true);
+    } else {
+        if hover {
+            round_rect(r.x, r.y, r.w, r.h, radius, Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 });
+        }
+        let edge = if !enabled {
+            Color { r: 0.153, g: 0.251, b: 0.204, a: 1.0 }
+        } else if hover {
+            GOLD
+        } else {
+            GOLD_DIM
+        };
+        round_outline(r.x, r.y, r.w, r.h, radius, 1.2, edge);
+        let fg = if enabled { CREAM } else { Color { r: 0.357, g: 0.435, b: 0.376, a: 1.0 } };
+        draw_raw(&label, tx, ty, size, fg, true);
+    }
     enabled && hover && is_mouse_button_pressed(MouseButton::Left)
 }
 
 fn small_button(r: Rect, label: &str, enabled: bool) -> bool {
     let (mx, my) = mouse_position();
     let hover = enabled && inr(r, mx, my);
-    draw_rectangle(
+    if hover {
+        round_rect(r.x, r.y, r.w, r.h, 6.0, Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 });
+    }
+    round_outline(
         r.x,
         r.y,
         r.w,
         r.h,
-        if !enabled {
-            BTN_OFF
-        } else if hover {
-            BTN_HOVER
-        } else {
-            BTN
-        },
+        6.0,
+        1.0,
+        if enabled { GOLD_DIM } else { Color { r: 0.153, g: 0.251, b: 0.204, a: 1.0 } },
     );
-    draw_rectangle_lines(r.x, r.y, r.w, r.h, 1.0, PANEL_EDGE);
     let size = (r.h * 0.55).clamp(9.0, 15.0);
-    centered(label, r.x + r.w * 0.5, r.y + r.h * 0.5, size, if enabled { TEXT } else { MUTED });
+    centered(label, r.x + r.w * 0.5, r.y + r.h * 0.5, size, if enabled { CREAM } else { MUTED });
     enabled && hover && is_mouse_button_pressed(MouseButton::Left)
-}
-
-fn tag(right: f32, cy: f32, label: &str, fg: Color) -> f32 {
-    let size = 10.0;
-    let w = measure(label, size, true).width + 14.0;
-    let h = 17.0;
-    draw_rectangle(
-        right - w,
-        cy - h * 0.5,
-        w,
-        h,
-        Color { r: fg.r * 0.26, g: fg.g * 0.26, b: fg.b * 0.26, a: 1.0 },
-    );
-    centered_bold(label, right - w * 0.5, cy, size, fg);
-    right - w - 6.0
 }
 
 fn modal_rect(w: f32, h: f32) -> Rect {
@@ -267,13 +397,16 @@ fn modal_shell(r: Rect, title: &str) -> Rect {
         0.0,
         screen_width(),
         screen_height(),
-        Color { r: 0.02, g: 0.02, b: 0.03, a: 0.68 },
+        Color { r: 0.012, g: 0.043, b: 0.031, a: 0.72 },
     );
-    draw_rectangle(r.x, r.y, r.w, r.h, MODAL_BG);
-    draw_rectangle_lines(r.x, r.y, r.w, r.h, 1.5, PANEL_EDGE);
-    draw_rectangle(r.x, r.y, r.w, 46.0, MODAL_HEADER);
-    centered_bold(title, r.x + r.w * 0.5, r.y + 23.0, 19.0, TEXT);
-    Rect::new(r.x + 20.0, r.y + 58.0, r.w - 40.0, r.h - 76.0)
+    // Drop shadow, card, gold rule under a serif title.
+    round_rect(r.x + 4.0, r.y + 8.0, r.w, r.h, 14.0, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.28 });
+    round_card(r.x, r.y, r.w, r.h, 14.0, MODAL_BG, CARD_EDGE);
+    round_rect(r.x, r.y, r.w, 54.0, 14.0, MODAL_HEADER);
+    draw_rectangle(r.x, r.y + 40.0, r.w, 14.0, MODAL_HEADER);
+    serif_center(title, r.x + r.w * 0.5, r.y + 27.0, 23.0, GOLD_SOFT);
+    draw_line(r.x + 26.0, r.y + 54.0, r.x + r.w - 26.0, r.y + 54.0, 1.0, GOLD_DIM);
+    Rect::new(r.x + 22.0, r.y + 66.0, r.w - 44.0, r.h - 86.0)
 }
 
 fn group_title(group: Group) -> &'static str {
@@ -387,20 +520,18 @@ pub fn frame(app: &mut App) {
 // ------------------------------------------------------------ setup screen
 
 fn draw_setup(app: &mut App) {
-    clear_background(BG);
+    felt_background();
     let sw = screen_width();
     let sh = screen_height();
     let w = 830.0_f32.min(sw - 32.0);
-    let h = (350.0 + app.setup.count as f32 * 54.0).min(sh - 32.0);
+    let h = (374.0 + app.setup.count as f32 * 54.0).min(sh - 32.0);
     let x = (sw - w) * 0.5;
     let y = (sh - h) * 0.5;
     // While the token picker is open it owns every click.
     let picker_open = app.setup.token_slot.is_some();
 
-    draw_rectangle(x, y, w, h, PANEL_BG);
-    draw_rectangle_lines(x, y, w, h, 1.5, PANEL_EDGE);
-    draw_rectangle(x, y, w, 106.0, MODAL_HEADER);
-    centered_bold("CRAZYPOLY", x + w * 0.5, y + 42.0, 42.0, ACCENT);
+    round_card(x, y, w, h, 16.0, PANEL_BG, CARD_EDGE);
+    serif_center("CrazyPoly", x + w * 0.5, y + 46.0, 50.0, GOLD_SOFT);
     centered(
         i18n::t(
             "The classic property trading game - 1 to 8 players, bots fill empty seats",
@@ -437,12 +568,26 @@ fn draw_setup(app: &mut App) {
     for i in 0..app.setup.count {
         let row = Rect::new(x + 28.0, ry, w - 56.0, 48.0);
         let editing = app.setup.editing == Some(i);
-        draw_rectangle(row.x, row.y, row.w, row.h, if editing { Color { r: 0.21, g: 0.23, b: 0.27, a: 1.0 } } else { ROW_BG });
-        draw_rectangle_lines(row.x, row.y, row.w, row.h, 1.0, PANEL_EDGE);
+        round_card(
+            row.x,
+            row.y,
+            row.w,
+            row.h,
+            10.0,
+            if editing { Color { r: 0.117, g: 0.278, b: 0.212, a: 1.0 } } else { ROW_BG },
+            if editing { GOLD } else { CARD_EDGE },
+        );
         let token_rect = Rect::new(row.x + 8.0, row.y + 2.0, 44.0, row.h - 4.0);
         let (tmx, tmy) = mouse_position();
         if inr(token_rect, tmx, tmy) {
-            draw_rectangle(token_rect.x, token_rect.y, token_rect.w, token_rect.h, BTN_HOVER);
+            round_rect(
+                token_rect.x,
+                token_rect.y,
+                token_rect.w,
+                token_rect.h,
+                8.0,
+                BTN_HOVER,
+            );
         }
         tokens::draw(
             app.setup.slots[i].token,
@@ -456,9 +601,24 @@ fn draw_setup(app: &mut App) {
         }
 
         let name_rect = Rect::new(row.x + 62.0, row.y + 8.0, row.w - 300.0, row.h - 16.0);
-        draw_rectangle(name_rect.x, name_rect.y, name_rect.w, name_rect.h, BTN_OFF);
+        round_rect(
+            name_rect.x,
+            name_rect.y,
+            name_rect.w,
+            name_rect.h,
+            8.0,
+            BTN_OFF,
+        );
         if editing {
-            draw_rectangle_lines(name_rect.x, name_rect.y, name_rect.w, name_rect.h, 1.5, ACCENT);
+            round_outline(
+                name_rect.x,
+                name_rect.y,
+                name_rect.w,
+                name_rect.h,
+                8.0,
+                1.5,
+                GOLD,
+            );
         }
         let shown = truncate(&app.setup.slots[i].name, name_rect.w - 16.0, 16.0);
         txt(&shown, name_rect.x + 9.0, name_rect.y + name_rect.h * 0.68, 16.0, TEXT);
@@ -478,34 +638,48 @@ fn draw_setup(app: &mut App) {
         let bot_rect = Rect::new(row.x + row.w - 120.0, row.y + 8.0, seg, row.h - 16.0);
         let human_on = !app.setup.slots[i].ai;
         let (mx, my) = mouse_position();
-        draw_rectangle(
+        round_rect(
             human_rect.x,
             human_rect.y,
             human_rect.w,
             human_rect.h,
+            8.0,
             if human_on {
-                ACCENT
+                GOLD
             } else if inr(human_rect, mx, my) {
                 BTN_HOVER
             } else {
                 BTN
             },
         );
-        draw_rectangle(
+        round_rect(
             bot_rect.x,
             bot_rect.y,
             bot_rect.w,
             bot_rect.h,
+            8.0,
             if !human_on {
-                Color { r: 0.24, g: 0.44, b: 0.68, a: 1.0 }
+                GOLD
             } else if inr(bot_rect, mx, my) {
                 BTN_HOVER
             } else {
                 BTN
             },
         );
-        centered_bold(i18n::t("HUMAN", "HUMAIN"), human_rect.x + seg * 0.5, human_rect.y + human_rect.h * 0.5, 12.0, TEXT);
-        centered_bold("BOT", bot_rect.x + seg * 0.5, bot_rect.y + bot_rect.h * 0.5, 12.0, TEXT);
+        centered_bold(
+            i18n::t("HUMAN", "HUMAIN"),
+            human_rect.x + seg * 0.5,
+            human_rect.y + human_rect.h * 0.5,
+            12.0,
+            if human_on { BG_DEEP } else { CREAM },
+        );
+        centered_bold(
+            "BOT",
+            bot_rect.x + seg * 0.5,
+            bot_rect.y + bot_rect.h * 0.5,
+            12.0,
+            if !human_on { BG_DEEP } else { CREAM },
+        );
         if !picker_open && inr(human_rect, mx, my) && is_mouse_button_pressed(MouseButton::Left) {
             app.setup.slots[i].ai = false;
         }
@@ -742,26 +916,30 @@ impl Geo {
     }
 }
 
+/// Three columns on the felt table: the players on the left, the board in the
+/// middle, the turn and its actions on the right.
 struct Layout {
     geo: Geo,
-    panel: Rect,
+    left: Rect,
+    right: Rect,
 }
 
 fn layout() -> Layout {
     let sw = screen_width();
     let sh = screen_height();
-    let m = 16.0;
-    let panel_min = 370.0;
-    let panel_max = 660.0;
-    let board_s = (sh - 2.0 * m).min(sw - panel_min - 3.0 * m).max(360.0);
-    let avail = sw - board_s - 3.0 * m;
-    let panel_w = avail.clamp(panel_min, panel_max);
-    let total = board_s + m + panel_w;
-    let x0 = ((sw - total) * 0.5).max(m);
+    let m = 20.0;
+    let side_want = (sw * 0.175).clamp(210.0, 300.0);
+    let board_s = (sh - 2.0 * m)
+        .min(sw - 2.0 * side_want - 4.0 * m)
+        .max(320.0);
+    let side = ((sw - board_s - 4.0 * m) * 0.5).max(170.0);
+    let x0 = m;
     let y0 = (sh - board_s) * 0.5;
+    let board_x = x0 + side + m;
     Layout {
-        geo: Geo::new(x0, y0, board_s),
-        panel: Rect::new(x0 + board_s + m, y0, panel_w, board_s),
+        geo: Geo::new(board_x, y0, board_s),
+        left: Rect::new(x0, y0, side, board_s),
+        right: Rect::new(board_x + board_s + m, y0, side, board_s),
     }
 }
 
@@ -774,8 +952,11 @@ enum Modal {
     Trade,
     Auction,
     Debt,
-    Buy,
     Over,
+}
+
+fn buying(g: &Game) -> bool {
+    g.phase == Phase::AwaitBuy && !g.players[g.turn].ai && g.dice_anim <= 0.0
 }
 
 fn active_modal(g: &Game, ui: &Ui) -> Modal {
@@ -797,9 +978,6 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
     if g.phase == Phase::Debt && !g.players[g.turn].ai {
         return Modal::Debt;
     }
-    if g.phase == Phase::AwaitBuy && !g.players[g.turn].ai {
-        return Modal::Buy;
-    }
     Modal::None
 }
 
@@ -813,9 +991,13 @@ fn draw_play(app: &mut App) {
     let modal = active_modal(g, ui);
     let input = modal == Modal::None;
 
-    clear_background(BG);
+    felt_background();
     draw_board(g, &lay, mx, my, input);
-    draw_panel(g, ui, &lay, input);
+    draw_left_column(g, &lay);
+    draw_right_column(g, ui, &lay, input);
+    if buying(g) {
+        draw_deed_card(g, &lay);
+    }
 
     let mut again = false;
     match modal {
@@ -824,7 +1006,6 @@ fn draw_play(app: &mut App) {
         Modal::Trade => draw_trade(g, ui),
         Modal::Auction => draw_auction(g),
         Modal::Debt => draw_debt(g, ui),
-        Modal::Buy => draw_buy(g),
         Modal::Over => again = draw_over(g),
     }
     if again {
@@ -867,7 +1048,17 @@ fn text_rect(r: &Rect, side: Side) -> Rect {
 
 fn draw_board(g: &Game, lay: &Layout, mx: f32, my: f32, input: bool) {
     let geo = &lay.geo;
-    draw_rectangle(geo.x - 5.0, geo.y - 5.0, geo.s + 10.0, geo.s + 10.0, Color { r: 0.09, g: 0.09, b: 0.10, a: 1.0 });
+    // The board is set in a thick wooden frame on the felt.
+    round_rect(
+        geo.x - 16.0,
+        geo.y - 14.0,
+        geo.s + 32.0,
+        geo.s + 32.0,
+        10.0,
+        Color { r: 0.0, g: 0.0, b: 0.0, a: 0.22 },
+    );
+    round_rect(geo.x - 14.0, geo.y - 14.0, geo.s + 28.0, geo.s + 28.0, 8.0, WOOD_EDGE);
+    round_rect(geo.x - 11.0, geo.y - 11.0, geo.s + 22.0, geo.s + 22.0, 6.0, WOOD);
     draw_rectangle(geo.x, geo.y, geo.s, geo.s, BOARD_BG);
 
     let mut hovered = None;
@@ -952,38 +1143,42 @@ fn draw_corner(space: &Space, r: Rect) {
     let cx = r.x + r.w * 0.5;
     match space.kind {
         Kind::Go => {
-            centered_bold("GO", cx, r.y + r.h * 0.29, r.w * 0.25, INK);
-            centered(i18n::t("COLLECT", "ENCAISSEZ"), cx, r.y + r.h * 0.50, r.w * 0.095, INK_SOFT);
-            centered_bold("200 $", cx, r.y + r.h * 0.585, r.w * 0.115, INK_SOFT);
-            let y = r.y + r.h * 0.78;
-            draw_line(r.x + r.w * 0.70, y, r.x + r.w * 0.32, y, 3.0, ACCENT);
-            draw_triangle(vec2(r.x + r.w * 0.30, y), vec2(r.x + r.w * 0.40, y - 7.0), vec2(r.x + r.w * 0.40, y + 7.0), ACCENT);
+            centered_bold(i18n::t("GO", "DÉPART"), cx, r.y + r.h * 0.30, r.w * 0.22, INK);
+            centered(i18n::t("COLLECT", "ENCAISSEZ"), cx, r.y + r.h * 0.50, r.w * 0.090, INK_SOFT);
+            centered_bold("200$", cx, r.y + r.h * 0.59, r.w * 0.120, INK_SOFT);
+            // The little red car that drives off the board.
+            let cy = r.y + r.h * 0.78;
+            draw_rectangle(r.x + r.w * 0.30, cy - r.h * 0.035, r.w * 0.40, r.h * 0.055, WINE);
+            draw_rectangle(r.x + r.w * 0.38, cy - r.h * 0.075, r.w * 0.22, r.h * 0.045, WINE);
+            draw_circle(r.x + r.w * 0.36, cy + r.h * 0.025, r.w * 0.045, INK);
+            draw_circle(r.x + r.w * 0.64, cy + r.h * 0.025, r.w * 0.045, INK);
         }
         Kind::Jail => {
-            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.24, r.w * 0.19, ACCENT);
-            centered(i18n::t("JUST", "SIMPLE"), cx, r.y + r.h * 0.60, r.w * 0.085, INK_SOFT);
-            centered(i18n::t("VISITING", "VISITE"), cx, r.y + r.h * 0.71, r.w * 0.085, INK_SOFT);
+            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.22, r.w * 0.20, INK);
+            centered(i18n::t("JUST", "SIMPLE"), cx, r.y + r.h * 0.62, r.w * 0.085, INK_SOFT);
+            centered(i18n::t("VISITING", "VISITE"), cx, r.y + r.h * 0.72, r.w * 0.085, INK_SOFT);
             for k in 0..5 {
-                let bx = r.x + r.w * 0.22 + k as f32 * r.w * 0.11;
-                draw_line(bx, r.y + r.h * 0.34, bx, r.y + r.h * 0.50, 2.0, INK);
+                let bx = r.x + r.w * 0.24 + k as f32 * r.w * 0.105;
+                draw_line(bx, r.y + r.h * 0.33, bx, r.y + r.h * 0.49, 2.0, INK);
             }
-            draw_line(r.x + r.w * 0.20, r.y + r.h * 0.34, r.x + r.w * 0.80, r.y + r.h * 0.34, 2.0, INK);
-            draw_line(r.x + r.w * 0.20, r.y + r.h * 0.50, r.x + r.w * 0.80, r.y + r.h * 0.50, 2.0, INK);
+            draw_line(r.x + r.w * 0.22, r.y + r.h * 0.33, r.x + r.w * 0.78, r.y + r.h * 0.33, 2.0, INK);
+            draw_line(r.x + r.w * 0.22, r.y + r.h * 0.49, r.x + r.w * 0.78, r.y + r.h * 0.49, 2.0, INK);
         }
         Kind::FreeParking => {
-            centered_bold(i18n::t("FREE", "PARC"), cx, r.y + r.h * 0.34, r.w * 0.16, INK);
-            centered_bold(i18n::t("PARKING", "GRATUIT"), cx, r.y + r.h * 0.47, r.w * 0.13, INK);
-            draw_rectangle(r.x + r.w * 0.30, r.y + r.h * 0.62, r.w * 0.40, r.h * 0.11, ACCENT);
-            draw_rectangle(r.x + r.w * 0.38, r.y + r.h * 0.56, r.w * 0.24, r.h * 0.07, ACCENT);
-            draw_circle(r.x + r.w * 0.38, r.y + r.h * 0.75, r.w * 0.045, INK);
-            draw_circle(r.x + r.w * 0.62, r.y + r.h * 0.75, r.w * 0.045, INK);
+            centered_bold(i18n::t("FREE", "PARC"), cx, r.y + r.h * 0.30, r.w * 0.155, INK);
+            centered_bold(i18n::t("PARKING", "GRATUIT"), cx, r.y + r.h * 0.42, r.w * 0.130, INK);
+            let cy = r.y + r.h * 0.66;
+            draw_rectangle(r.x + r.w * 0.28, cy, r.w * 0.44, r.h * 0.075, WINE);
+            draw_rectangle(r.x + r.w * 0.36, cy - r.h * 0.045, r.w * 0.26, r.h * 0.050, WINE);
+            draw_circle(r.x + r.w * 0.34, cy + r.h * 0.085, r.w * 0.045, INK);
+            draw_circle(r.x + r.w * 0.66, cy + r.h * 0.085, r.w * 0.045, INK);
         }
         _ => {
-            centered_bold(i18n::t("GO TO", "ALLEZ EN"), cx, r.y + r.h * 0.32, r.w * 0.135, INK);
-            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.50, r.w * 0.19, ACCENT);
+            centered_bold(i18n::t("GO TO", "ALLEZ EN"), cx, r.y + r.h * 0.31, r.w * 0.135, INK);
+            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.46, r.w * 0.175, INK);
             let y = r.y + r.h * 0.70;
-            draw_line(r.x + r.w * 0.26, y, r.x + r.w * 0.72, y, 2.5, INK);
-            draw_triangle(vec2(r.x + r.w * 0.76, y), vec2(r.x + r.w * 0.66, y - 6.0), vec2(r.x + r.w * 0.66, y + 6.0), INK);
+            draw_line(r.x + r.w * 0.44, y, r.x + r.w * 0.76, y, 2.5, INK);
+            draw_triangle(vec2(r.x + r.w * 0.80, y), vec2(r.x + r.w * 0.70, y - 6.0), vec2(r.x + r.w * 0.70, y + 6.0), INK);
         }
     }
 }
@@ -1056,7 +1251,7 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
             } else {
                 r.y + r.h - 6.0
             };
-            centered_bold(&format!("{} $", value), r.x + r.w * 0.5, py - 3.0, r.w * 0.12, INK_SOFT);
+            centered_bold(&format!("{}$", value), r.x + r.w * 0.5, py - 3.0, r.w * 0.115, INK_SOFT);
         }
     }
 
@@ -1064,10 +1259,10 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
 
     if let Some(owner) = g.props[i].owner {
         let color = g.players[owner].color;
-        draw_rectangle(r.x, r.y, r.w, r.h, Color { r: color.r, g: color.g, b: color.b, a: 0.12 });
+        draw_rectangle(r.x, r.y, r.w, r.h, Color { r: color.r, g: color.g, b: color.b, a: 0.10 });
         let (dx, dy) = owner_dot(&r, side);
-        draw_circle(dx, dy, 5.5, color);
-        draw_circle_lines(dx, dy, 5.5, 1.0, INK_LINE);
+        draw_circle(dx, dy, 4.8, color);
+        draw_circle_lines(dx, dy, 4.8, 1.2, TILE);
         if g.props[i].mortgaged {
             draw_rectangle(r.x, r.y, r.w, r.h, Color { r: 0.10, g: 0.10, b: 0.10, a: 0.40 });
             centered_bold("M", dx, dy, 8.0, WHITE);
@@ -1099,21 +1294,46 @@ fn draw_tokens(g: &Game, geo: &Geo) {
                 cy -= (anim.t * std::f32::consts::PI).sin() * r.h * 0.35;
             }
         }
-        let radius = (r.w * 0.175).clamp(9.0, 15.0);
-        tokens::draw(player.token, player.color, cx, cy, radius);
+        // Round chip with the player's token drawn in white on it.
+        let radius = (r.w * 0.165).clamp(8.0, 14.0);
+        draw_circle(cx + 1.0, cy + 2.0, radius, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.16 });
+        draw_circle(cx, cy, radius, player.color);
+        draw_circle_lines(cx, cy, radius, 1.2, Color { r: 1.0, g: 1.0, b: 1.0, a: 0.55 });
+        tokens::draw(player.token, WHITE, cx, cy, radius * 0.74);
     }
 }
 
 fn draw_deck_box(top: &str, bottom: &str, x: f32, y: f32, w: f32, h: f32, color: Color) {
-    draw_rectangle(x + 3.0, y + 4.0, w, h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.18 });
+    draw_rectangle(x + 3.0, y + 5.0, w, h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.10 });
     draw_rectangle(x, y, w, h, TILE);
-    draw_rectangle_lines(x, y, w, h, 2.5, color);
-    centered_bold("?", x + w * 0.22, y + h * 0.34, h * 0.34, color);
-    centered_bold(top, x + w * 0.60, y + h * 0.34, w * 0.10, color);
+    draw_rectangle_lines(x, y, w, h, 1.6, color);
+    centered_bold("?", x + w * 0.20, y + h * 0.33, h * 0.30, color);
+    centered_bold(top, x + w * 0.58, y + h * 0.33, w * 0.095, color);
     if !bottom.is_empty() {
-        centered(bottom, x + w * 0.60, y + h * 0.55, w * 0.075, INK_SOFT);
+        centered(bottom, x + w * 0.58, y + h * 0.52, w * 0.072, INK_SOFT);
     }
-    centered(i18n::t("PLACE CARD HERE", "POSEZ LA CARTE ICI"), x + w * 0.5, y + h * 0.85, w * 0.055, Color { r: 0.52, g: 0.50, b: 0.46, a: 1.0 });
+    centered(
+        i18n::t("PLACE CARD HERE", "POSEZ LA CARTE ICI"),
+        x + w * 0.5,
+        y + h * 0.84,
+        w * 0.052,
+        Color { r: 0.541, g: 0.514, b: 0.443, a: 1.0 },
+    );
+}
+
+/// Small caps with extra letter spacing, as used for the board's subtitle.
+fn spaced_center(text: &str, cx: f32, cy: f32, size: f32, spacing: f32, color: Color) {
+    let mut total = 0.0;
+    for ch in text.chars() {
+        total += text_w(&ch.to_string(), size) + spacing;
+    }
+    total -= spacing;
+    let mut x = cx - total * 0.5;
+    for ch in text.chars() {
+        let glyph = ch.to_string();
+        txt(&glyph, x, cy + size * 0.34, size, color);
+        x += text_w(&glyph, size) + spacing;
+    }
 }
 
 fn draw_center(g: &Game, geo: &Geo) {
@@ -1121,8 +1341,15 @@ fn draw_center(g: &Game, geo: &Geo) {
     draw_rectangle(c.x, c.y, c.w, c.h, CENTER_BG);
     let cx = c.x + c.w * 0.5;
 
-    centered_bold("MONOPOLY", cx, c.y + c.h * 0.115, c.w * 0.105, ACCENT);
-    centered(i18n::t("CRAZYPOLY EDITION", "ÉDITION CRAZYPOLY"), cx, c.y + c.h * 0.178, c.w * 0.030, Color { r: 0.36, g: 0.34, b: 0.31, a: 1.0 });
+    serif_center("MONOPOLY", cx, c.y + c.h * 0.100, c.w * 0.130, WINE);
+    spaced_center(
+        i18n::t("CRAZYPOLY EDITION", "ÉDITION CRAZYPOLY"),
+        cx,
+        c.y + c.h * 0.172,
+        c.w * 0.026,
+        c.w * 0.005,
+        INK_SOFT,
+    );
 
     let bw = c.w * 0.30;
     let bh = c.h * 0.155;
@@ -1149,30 +1376,35 @@ fn draw_center(g: &Game, geo: &Geo) {
     let dy = c.y + c.h * 0.53;
     let ds = (c.w * 0.105).min(c.h * 0.105);
     crate::dice::draw(g, cx, dy, ds);
-    centered(
+    serif_center(
         &format!("{} + {} = {}", g.dice.0, g.dice.1, g.dice.0 as u16 + g.dice.1 as u16),
         cx,
-        dy + ds * 0.82,
-        ds * 0.32,
+        dy + ds * 0.90,
+        ds * 0.42,
         INK_SOFT,
     );
 
     let player = &g.players[g.turn];
     let label = crate::tr!("{}'s turn", "Tour de {}", player.name);
-    let label_w = measure(&label, c.w * 0.036, false).width;
-    draw_circle(cx - label_w * 0.5 - 16.0, c.y + c.h * 0.70, 7.0, player.color);
-    centered(&label, cx, c.y + c.h * 0.70, c.w * 0.036, INK);
-    centered(&phase_hint(g), cx, c.y + c.h * 0.745, c.w * 0.026, Color { r: 0.26, g: 0.25, b: 0.23, a: 1.0 });
+    serif_center(&label, cx, c.y + c.h * 0.715, c.w * 0.040, WINE);
+    centered(&phase_hint(g), cx, c.y + c.h * 0.762, c.w * 0.023, INK_SOFT);
 
     if let Some((text, _)) = &g.banner {
         let bcard_w = c.w * 0.76;
         let bcard_h = c.h * 0.22;
         let bx = c.x + (c.w - bcard_w) * 0.5;
         let by2 = c.y + c.h - bcard_h - c.h * 0.02;
-        draw_rectangle(bx + 3.0, by2 + 4.0, bcard_w, bcard_h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.20 });
-        draw_rectangle(bx, by2, bcard_w, bcard_h, WHITE);
-        draw_rectangle_lines(bx, by2, bcard_w, bcard_h, 2.0, ACCENT);
-        centered_bold(i18n::t("CARD DRAWN", "CARTE TIRÉE"), bx + bcard_w * 0.5, by2 + bcard_h * 0.18, c.w * 0.024, MUTED);
+        draw_rectangle(bx + 3.0, by2 + 5.0, bcard_w, bcard_h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.16 });
+        draw_rectangle(bx, by2, bcard_w, bcard_h, TILE);
+        draw_rectangle_lines(bx, by2, bcard_w, bcard_h, 1.5, GOLD);
+        spaced_center(
+            i18n::t("CARD DRAWN", "CARTE TIRÉE"),
+            bx + bcard_w * 0.5,
+            by2 + bcard_h * 0.16,
+            c.w * 0.020,
+            c.w * 0.003,
+            GOLD_DIM,
+        );
         let lines = wrap(text, bcard_w - 24.0, c.w * 0.027);
         let lh = c.w * 0.034;
         let start = by2 + bcard_h * 0.38;
@@ -1279,136 +1511,424 @@ fn draw_tooltip(g: &Game, geo: &Geo, tile: usize, mx: f32, my: f32) {
     }
 }
 
-// -------------------------------------------------------------------- panel
+// ------------------------------------------------------------------- columns
 
-fn draw_panel(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
-    let p = lay.panel;
-    draw_rectangle(p.x, p.y, p.w, p.h, PANEL_BG);
-    draw_rectangle_lines(p.x, p.y, p.w, p.h, 1.0, PANEL_EDGE);
-    draw_rectangle(p.x, p.y, p.w, 66.0, MODAL_HEADER);
-    txt_bold("CRAZYPOLY", p.x + 18.0, p.y + 30.0, 21.0, ACCENT);
+/// Serif text broken to fit `max_w` at a fixed size.
+fn serif_lines(text: &str, max_w: f32, size: f32) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        let candidate = if current.is_empty() {
+            word.to_string()
+        } else {
+            format!("{} {}", current, word)
+        };
+        if serif_w(&candidate, size) <= max_w || current.is_empty() {
+            current = candidate;
+        } else {
+            out.push(current);
+            current = word.to_string();
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
+}
+
+fn spaced_left(text: &str, x: f32, baseline: f32, size: f32, spacing: f32, color: Color) {
+    let mut cx = x;
+    for ch in text.chars() {
+        let glyph = ch.to_string();
+        txt(&glyph, cx, baseline, size, color);
+        cx += text_w(&glyph, size) + spacing;
+    }
+}
+
+/// The line the right-hand card shows: what the game is waiting for.
+fn turn_statement(g: &Game) -> (String, String) {
+    let player = &g.players[g.turn];
+    match g.phase {
+        Phase::Roll => {
+            if player.in_jail {
+                (
+                    i18n::t("You are in jail", "Vous êtes en prison").to_string(),
+                    i18n::t(
+                        "Roll doubles, pay the fine or use a card.",
+                        "Faites un double, payez l'amende ou utilisez une carte.",
+                    )
+                    .to_string(),
+                )
+            } else if g.rolled_double {
+                (
+                    i18n::t("Doubles! Roll again", "Double ! Relancez les dés").to_string(),
+                    i18n::t("You move again.", "Vous rejouez.").to_string(),
+                )
+            } else if player.ai {
+                (
+                    crate::tr!("{} is playing", "{} joue", player.name),
+                    i18n::t("The dice are about to roll.", "Les dés vont être lancés.").to_string(),
+                )
+            } else {
+                (
+                    i18n::t("Roll the dice to move", "Lancez les dés pour avancer").to_string(),
+                    i18n::t("Good luck.", "Bonne chance.").to_string(),
+                )
+            }
+        }
+        Phase::Moving => (
+            i18n::t("Moving...", "Déplacement...").to_string(),
+            String::new(),
+        ),
+        Phase::AwaitBuy => {
+            let space = &g.spaces[player.pos];
+            (
+                crate::tr!("{} is for sale", "{} est libre", space.name),
+                crate::tr!(
+                    "Buy it for {} or pass.",
+                    "Achetez-la pour {} ou passez.",
+                    money(space.price as i64)
+                ),
+            )
+        }
+        Phase::Auction => (
+            i18n::t("Auction in progress", "Enchères en cours").to_string(),
+            i18n::t(
+                "The highest bid wins the lot.",
+                "La meilleure offre remporte le bien.",
+            )
+            .to_string(),
+        ),
+        Phase::Debt => (
+            i18n::t("You owe money", "Vous devez de l'argent").to_string(),
+            crate::tr!(
+                "Sell buildings or mortgage lots to pay {}.",
+                "Vendez des constructions ou hypothéquez pour payer {}.",
+                money(g.debt_amount())
+            ),
+        ),
+        Phase::Manage => (
+            i18n::t("Your move", "À vous de jouer").to_string(),
+            i18n::t(
+                "Build, trade or mortgage, then end your turn.",
+                "Construisez, échangez ou hypothéquez, puis terminez votre tour.",
+            )
+            .to_string(),
+        ),
+        Phase::Over => (
+            i18n::t("Game over", "Partie terminée").to_string(),
+            String::new(),
+        ),
+    }
+}
+
+fn log_color(g: &Game, line: &str) -> Color {
+    if line.starts_with("--") {
+        return GOLD_DIM;
+    }
+    for player in g.players.iter() {
+        if !player.name.is_empty() && line.contains(&player.name) {
+            return player.color;
+        }
+    }
+    DIM_GREEN
+}
+
+fn draw_left_column(g: &Game, lay: &Layout) {
+    let p = lay.left;
+    let logo = (p.w * 0.20).clamp(26.0, 46.0);
+    serif_left("CrazyPoly", p.x + 2.0, p.y + logo, logo, GOLD_SOFT);
     txt(
         &crate::tr!(
-            "{} players - {} solvent",
-            "{} joueurs - {} solvables",
-            g.players.len(),
-            g.active_count()
+            "Salon edition - {} players",
+            "Édition salon - {} joueurs",
+            g.players.len()
         ),
-        p.x + 18.0,
-        p.y + 51.0,
-        11.0,
-        TEXT_DIM,
+        p.x + 3.0,
+        p.y + logo + 20.0,
+        12.5,
+        CREAM_DIM,
     );
-    text_r(
-        &crate::tr!(
-            "BANK {} H / {} T",
-            "BANQUE {} M / {} H",
-            g.houses_left,
-            g.hotels_left
+
+    let n = g.players.len();
+    let top = p.y + logo + 40.0;
+    let reserved = 118.0;
+    let avail = (p.y + p.h - reserved - top).max(60.0);
+    let gap = (p.w * 0.035).clamp(6.0, 12.0);
+    let card_h = ((avail - gap * (n as f32 - 1.0)) / n as f32).clamp(50.0, 104.0);
+    for i in 0..n {
+        let r = Rect::new(p.x, top + i as f32 * (card_h + gap), p.w, card_h);
+        draw_player_card(g, i, r);
+    }
+
+    let bank_y = top + n as f32 * (card_h + gap) + 6.0;
+    let bank_h = (p.y + p.h - bank_y - 42.0).min(76.0);
+    if bank_h > 34.0 {
+        let r = Rect::new(p.x, bank_y, p.w, bank_h);
+        round_card(r.x, r.y, r.w, r.h, 12.0, CARD, CARD_EDGE);
+        txt(
+            i18n::t("Bank", "Banque"),
+            r.x + 16.0,
+            r.y + 24.0,
+            12.0,
+            CREAM_DIM,
+        );
+        serif_left(
+            &crate::tr!(
+                "{} houses / {} hotels",
+                "{} M / {} H",
+                g.houses_left,
+                g.hotels_left
+            ),
+            r.x + 16.0,
+            r.y + bank_h - 16.0,
+            21.0,
+            GOLD_SOFT,
+        );
+    }
+
+    if button(
+        Rect::new(p.x, p.y + p.h - 30.0, 64.0, 28.0),
+        i18n::code(),
+        true,
+        false,
+    ) {
+        i18n::toggle();
+    }
+}
+
+fn draw_player_card(g: &Game, index: usize, r: Rect) {
+    let player = &g.players[index];
+    let current = index == g.turn && g.phase != Phase::Over;
+    let fill = if player.bankrupt {
+        Color { r: 0.051, g: 0.141, b: 0.106, a: 1.0 }
+    } else if current {
+        Color { r: 0.090, g: 0.227, b: 0.173, a: 1.0 }
+    } else {
+        CARD
+    };
+    round_card(r.x, r.y, r.w, r.h, 12.0, fill, CARD_EDGE);
+    if current {
+        round_outline(r.x, r.y, r.w, r.h, 12.0, 1.4, GOLD);
+    }
+
+    let radius = (r.h * 0.15).clamp(8.0, 15.0);
+    let cx = r.x + 13.0 + radius;
+    let cy = r.y + 13.0 + radius;
+    draw_circle(
+        cx,
+        cy,
+        radius,
+        if player.bankrupt { MUTED } else { player.color },
+    );
+    tokens::draw(player.token, WHITE, cx, cy, radius * 0.74);
+
+    let text_x = cx + radius + 13.0;
+    let name_size = (r.h * 0.20).clamp(12.0, 18.0);
+    let cash_size = (r.h * 0.20).clamp(12.0, 19.0);
+    let cash = money(player.cash);
+    let cash_w = serif_w(&cash, cash_size);
+    serif_right(
+        &cash,
+        r.x + r.w - 14.0,
+        r.y + name_size + 10.0,
+        cash_size,
+        if current { GOLD_SOFT } else { CREAM },
+    );
+    txt_bold(
+        &truncate(
+            &player.name,
+            r.x + r.w - 14.0 - cash_w - 12.0 - text_x,
+            name_size,
         ),
-        p.x + p.w - 78.0,
-        p.y + 51.0,
+        text_x,
+        r.y + name_size + 8.0,
+        name_size,
+        if player.bankrupt { MUTED } else { CREAM },
+    );
+
+    let status = if player.bankrupt {
+        i18n::t("Bankrupt", "En faillite").to_string()
+    } else if current {
+        i18n::t("Their turn", "Son tour").to_string()
+    } else if player.in_jail {
+        i18n::t("In jail", "En prison").to_string()
+    } else {
+        i18n::t("Waiting", "En attente").to_string()
+    };
+    txt(
+        &status,
+        text_x,
+        r.y + name_size + 24.0,
+        11.0,
+        if current { GOLD_SOFT } else { MUTED },
+    );
+
+    if r.h < 64.0 {
+        return;
+    }
+    let owned = g.owned_tiles(index);
+    let chips_y = r.y + r.h - 14.0;
+    let mut x = text_x;
+    for tile in owned.iter().take(6) {
+        draw_rectangle(x, chips_y - 4.5, 9.0, 9.0, g.spaces[*tile].group.color());
+        x += 11.0;
+    }
+    if !owned.is_empty() {
+        x += 3.0;
+    }
+    let houses: u32 = owned.iter().map(|t| g.props[*t].houses as u32).sum();
+    let mut parts = vec![crate::tr!("{} lots", "{} biens", owned.len())];
+    if houses > 0 {
+        parts.push(crate::tr!("{} houses", "{} maisons", houses));
+    }
+    let complete = [
+        Group::Brown,
+        Group::LightBlue,
+        Group::Pink,
+        Group::Orange,
+        Group::Red,
+        Group::Yellow,
+        Group::Green,
+        Group::DarkBlue,
+    ]
+    .iter()
+    .filter(|group| g.has_monopoly(index, **group))
+    .count();
+    if complete > 0 {
+        parts.push(i18n::t("complete set", "série complète").to_string());
+    }
+    txt(
+        &truncate(&parts.join(" · "), r.x + r.w - 14.0 - x, 10.5),
+        x,
+        chips_y + 3.5,
         10.5,
         MUTED,
     );
-    if button(Rect::new(p.x + p.w - 62.0, p.y + 14.0, 46.0, 26.0), i18n::code(), true, false) {
-        i18n::toggle();
-    }
+}
 
-    let n = g.players.len();
-    let rows_top = p.y + 78.0;
-    let reserved_log = 250.0;
-    let actions_h = 130.0;
-    let avail = (p.h - 78.0 - actions_h - reserved_log).max(120.0);
-    let row_h = (avail / n as f32).clamp(36.0, 76.0);
-    for i in 0..n {
-        let r = Rect::new(p.x + 12.0, rows_top + i as f32 * row_h, p.w - 24.0, row_h - 5.0);
-        draw_player_row(g, i, r);
-    }
+fn draw_right_column(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
+    let p = lay.right;
+    let human = !g.players[g.turn].ai;
+    let name = g.players[g.turn].name.clone();
+    let cash = g.players[g.turn].cash;
+    let color = g.players[g.turn].color;
+    let in_jail = g.players[g.turn].in_jail;
+    let cards = g.players[g.turn].jail_cards;
 
-    let actions_top = rows_top + n as f32 * row_h + 8.0;
-    let cur_name = g.players[g.turn].name.clone();
-    let cur_cash = g.players[g.turn].cash;
-    let cur_color = g.players[g.turn].color;
-    let cur_ai = g.players[g.turn].ai;
-    let cur_in_jail = g.players[g.turn].in_jail;
-    let cur_cards = g.players[g.turn].jail_cards;
-    draw_circle(p.x + 21.0, actions_top + 8.0, 6.0, cur_color);
-    let turn_label = if cur_ai {
-        crate::tr!("{} (BOT) is playing", "{} (BOT) joue", cur_name)
-    } else {
-        format!("{} - {}", cur_name, money(cur_cash))
-    };
-    txt_bold(&truncate(&turn_label, p.w - 44.0, 14.0), p.x + 32.0, actions_top + 13.0, 14.0, TEXT);
+    // ---- statement card
+    let card_h = (p.h * 0.20).clamp(112.0, 170.0);
+    round_card(p.x, p.y, p.w, card_h, 14.0, CARD, CARD_EDGE);
+    draw_circle(p.x + 19.0, p.y + 22.0, 5.0, color);
     txt(
-        &truncate(&phase_hint(g), p.w - 36.0, 11.5),
-        p.x + 16.0,
-        actions_top + 32.0,
-        11.5,
-        TEXT_DIM,
+        &format!("{} · {}", truncate(&name, p.w - 90.0, 12.5), money(cash)),
+        p.x + 31.0,
+        p.y + 26.0,
+        12.5,
+        CREAM_DIM,
     );
+    let (title, sub) = turn_statement(g);
+    let title_size = (p.w * 0.085).clamp(15.0, 25.0);
+    let mut ty = p.y + 40.0 + title_size;
+    for line in serif_lines(&title, p.w - 32.0, title_size).iter().take(2) {
+        serif_left(line, p.x + 16.0, ty, title_size, GOLD_SOFT);
+        ty += title_size * 1.15;
+    }
+    if !sub.is_empty() {
+        let sub_size = (p.w * 0.043).clamp(10.5, 12.5);
+        for line in wrap(&sub, p.w - 32.0, sub_size).iter().take(2) {
+            txt(line, p.x + 16.0, ty + sub_size, sub_size, CREAM_DIM);
+            ty += sub_size * 1.45;
+        }
+    }
 
-    let human = !cur_ai;
-    let inner = p.w - 36.0;
-    let bw = (inner - 16.0) / 3.0;
-    let bh = 40.0;
-    let row1 = actions_top + 44.0;
-    let row2 = row1 + bh + 8.0;
-
-    let roll_label = if cur_in_jail && g.phase == Phase::Roll {
-        i18n::t("ROLL FOR DOUBLES", "TENTER UN DOUBLE")
-    } else if g.rolled_double {
-        i18n::t("ROLL AGAIN", "RELANCER")
+    // ---- actions
+    let bh = (p.h * 0.055).clamp(34.0, 50.0);
+    let gap = (p.h * 0.012).clamp(7.0, 11.0);
+    let half = (p.w - gap) * 0.5;
+    let mut y = p.y + card_h + 14.0;
+    let price = if buying(g) {
+        Some(g.spaces[g.players[g.turn].pos].price as i64)
     } else {
-        i18n::t("ROLL DICE", "LANCER LES DÉS")
+        None
     };
-    if button(
-        Rect::new(p.x + 18.0, row1, bw, bh),
-        roll_label,
-        input && human && g.phase == Phase::Roll,
-        true,
-    ) {
-        g.roll();
-    }
 
-    let context = Rect::new(p.x + 18.0 + bw + 8.0, row1, bw, bh);
-    if cur_in_jail && g.phase == Phase::Roll {
-        if cur_cards > 0 {
-            if button(context, i18n::t("USE JAIL CARD", "CARTE PRISON"), input, false) {
-                g.use_jail_card();
-            }
-        } else if button(
-            context,
-            &crate::tr!("PAY {}", "PAYER {}", money(crate::game::JAIL_FINE)),
-            input && cur_cash >= crate::game::JAIL_FINE,
-            false,
-        ) {
-            g.pay_jail_fine();
-        }
-    } else if g.phase == Phase::Debt {
+    if let Some(price) = price {
         if button(
-            context,
-            &crate::tr!("PAY {}", "PAYER {}", money(g.debt_amount())),
-            input && g.can_afford_debt(),
+            Rect::new(p.x, y, p.w, bh + 4.0),
+            &crate::tr!("BUY FOR {}", "ACHETER · {}", money(price)),
+            input && cash >= price,
+            true,
+        ) {
+            g.buy();
+        }
+        y += bh + 4.0 + gap;
+        if button(
+            Rect::new(p.x, y, p.w, bh),
+            i18n::t("PASS", "PASSER"),
+            input,
             false,
         ) {
-            g.pay_debt();
+            g.start_auction_current();
         }
+        y += bh + gap;
     } else {
-        button(context, " ", false, false);
+        let roll_label = if in_jail && g.phase == Phase::Roll {
+            i18n::t("ROLL FOR DOUBLES", "TENTER UN DOUBLE")
+        } else if g.rolled_double {
+            i18n::t("ROLL AGAIN", "RELANCER")
+        } else {
+            i18n::t("ROLL THE DICE", "LANCER LES DÉS")
+        };
+        if button(
+            Rect::new(p.x, y, p.w, bh + 4.0),
+            roll_label,
+            input && human && g.phase == Phase::Roll,
+            true,
+        ) {
+            g.roll();
+        }
+        y += bh + 4.0 + gap;
+
+        if g.phase == Phase::Debt && human {
+            if button(
+                Rect::new(p.x, y, p.w, bh),
+                &crate::tr!("PAY {}", "PAYER {}", money(g.debt_amount())),
+                input && g.can_afford_debt(),
+                false,
+            ) {
+                g.pay_debt();
+            }
+            y += bh + gap;
+        } else if in_jail && g.phase == Phase::Roll {
+            let label = if cards > 0 {
+                i18n::t("USE A JAIL CARD", "UTILISER UNE CARTE")
+            } else {
+                i18n::t("PAY THE FINE", "PAYER L'AMENDE")
+            };
+            if button(Rect::new(p.x, y, p.w, bh), label, input && human, false) {
+                if cards > 0 {
+                    g.use_jail_card();
+                } else {
+                    g.pay_jail_fine();
+                }
+            }
+            y += bh + gap;
+        } else if g.phase == Phase::Manage && human {
+            if button(
+                Rect::new(p.x, y, p.w, bh),
+                i18n::t("END MY TURN", "TERMINER MON TOUR"),
+                input,
+                false,
+            ) {
+                g.end_turn();
+            }
+            y += bh + gap;
+        }
     }
 
     if button(
-        Rect::new(p.x + 18.0 + 2.0 * (bw + 8.0), row1, bw, bh),
-        i18n::t("END TURN", "FIN DU TOUR"),
-        input && human && g.phase == Phase::Manage,
-        false,
-    ) {
-        g.end_turn();
-    }
-
-    if button(
-        Rect::new(p.x + 18.0, row2, bw, bh),
+        Rect::new(p.x, y, half, bh),
         i18n::t("ASSETS", "MES BIENS"),
         input && human && g.can_manage(),
         false,
@@ -1417,13 +1937,15 @@ fn draw_panel(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
         ui.asset_page = 0;
     }
     if button(
-        Rect::new(p.x + 18.0 + bw + 8.0, row2, bw, bh),
+        Rect::new(p.x + half + gap, y, half, bh),
         i18n::t("TRADE", "ÉCHANGE"),
         input && human && g.can_manage() && g.active_count() > 1,
         false,
     ) {
         g.open_trade();
     }
+    y += bh + gap;
+
     let can_save = input
         && human
         && matches!(g.phase, Phase::Roll | Phase::Manage)
@@ -1431,7 +1953,7 @@ fn draw_panel(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
         && g.trade.is_none()
         && g.debt.is_none();
     if button(
-        Rect::new(p.x + 18.0 + 2.0 * (bw + 8.0), row2, bw, bh),
+        Rect::new(p.x, y, half, bh),
         i18n::t("SAVE", "SAUVER"),
         can_save,
         false,
@@ -1444,146 +1966,157 @@ fn draw_panel(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
             )),
             Err(err) => g.log(crate::tr!(
                 "Could not save: {}",
-                "Sauvegarde impossible : {}",
+                "Impossible de sauvegarder : {}",
                 err
             )),
         }
     }
+    if button(
+        Rect::new(p.x + half + gap, y, half, bh),
+        i18n::t("END TURN", "FIN DU TOUR"),
+        input && human && g.phase == Phase::Manage,
+        false,
+    ) {
+        g.end_turn();
+    }
+    y += bh + gap + 4.0;
 
-    let log_top = row2 + bh + 22.0;
-    draw_line(p.x + 12.0, log_top - 6.0, p.x + p.w - 12.0, log_top - 6.0, 1.0, PANEL_EDGE);
-    txt_bold(i18n::t("GAME LOG", "JOURNAL DE PARTIE"), p.x + 18.0, log_top + 12.0, 10.5, MUTED);
-    let size = 11.5;
-    let line_h = 14.5;
-    let available = (p.y + p.h - 14.0) - (log_top + 22.0);
-    let max_lines = (available / line_h).max(1.0) as usize;
-    let mut lines: Vec<String> = Vec::new();
-    for msg in g.log.iter().rev() {
-        let wrapped = wrap(msg, p.w - 36.0, size);
-        for line in wrapped.into_iter().rev() {
-            lines.push(line);
-            if lines.len() >= max_lines {
-                break;
-            }
-        }
-        if lines.len() >= max_lines {
-            break;
-        }
-    }
-    lines.reverse();
-    for (k, line) in lines.iter().enumerate() {
-        let color = if line.starts_with("--") { ACCENT_SOFT } else { TEXT_DIM };
-        txt(line, p.x + 18.0, log_top + 30.0 + k as f32 * line_h, size, color);
-    }
+    draw_log(g, p, y);
 }
 
-fn draw_player_row(g: &Game, index: usize, r: Rect) {
-    let player = &g.players[index];
-    let is_current = index == g.turn && g.phase != Phase::Over;
-    let bg = if player.bankrupt {
-        Color { r: 0.105, g: 0.11, b: 0.12, a: 1.0 }
-    } else if is_current {
-        Color { r: 0.21, g: 0.225, b: 0.27, a: 1.0 }
-    } else {
-        Color { r: 0.15, g: 0.16, b: 0.185, a: 1.0 }
-    };
-    draw_rectangle(r.x, r.y, r.w, r.h, bg);
-    if is_current {
-        draw_rectangle(r.x, r.y, 3.0, r.h, player.color);
+fn draw_log(g: &Game, p: Rect, top: f32) {
+    let h = p.y + p.h - top;
+    if h < 56.0 {
+        return;
     }
-    tokens::draw(
-        player.token,
-        if player.bankrupt { MUTED } else { player.color },
-        r.x + 23.0,
-        r.y + r.h * 0.5,
-        12.0,
+    round_card(p.x, top, p.w, h, 14.0, CARD, CARD_EDGE);
+    spaced_left(
+        i18n::t("GAME LOG", "JOURNAL DE PARTIE"),
+        p.x + 16.0,
+        top + 24.0,
+        9.5,
+        1.7,
+        GOLD_DIM,
     );
-
-    txt_bold(
-        &truncate(&player.name, r.w - 170.0, 15.0),
-        r.x + 44.0,
-        r.y + r.h * 0.42,
-        15.0,
-        if player.bankrupt { MUTED } else { TEXT },
-    );
-    let props = g.owned_tiles(index).len();
-    let sub = format!(
-        "{}   {} {}",
-        money(player.cash),
-        props,
-        i18n::t("lots", "biens")
-    );
-    txt(&sub, r.x + 44.0, r.y + r.h * 0.74, 11.0, if player.bankrupt { MUTED } else { TEXT_DIM });
-
-    let mut right = r.x + r.w - 8.0;
-    if player.bankrupt {
-        tag(right, r.y + r.h * 0.5, i18n::t("BANKRUPT", "FAILLITE"), MUTED);
-    } else {
-        if player.ai {
-            right = tag(right, r.y + r.h * 0.5, "BOT", Color { r: 0.58, g: 0.74, b: 0.98, a: 1.0 });
+    let size = (p.w * 0.042).clamp(10.0, 12.0);
+    let line_h = size * 1.35;
+    let max_lines = (((h - 40.0) / line_h).floor() as usize).max(1);
+    let mut lines: Vec<(String, Color, bool)> = Vec::new();
+    for msg in g.log.iter().rev() {
+        let color = log_color(g, msg);
+        let wrapped = wrap(msg, p.w - 44.0, size);
+        let mut entry: Vec<(String, Color, bool)> = wrapped
+            .into_iter()
+            .enumerate()
+            .map(|(k, text)| (text, color, k == 0))
+            .collect();
+        if lines.len() + entry.len() > max_lines {
+            break;
         }
-        if player.in_jail {
-            right = tag(right, r.y + r.h * 0.5, i18n::t("JAIL", "PRISON"), WARN);
+        entry.append(&mut lines);
+        lines = entry;
+    }
+    let mut cy = top + 38.0 + size;
+    for (text, color, bullet) in lines {
+        if bullet {
+            draw_circle(p.x + 20.0, cy - size * 0.32, 3.0, color);
         }
-        if player.jail_cards > 0 {
-            tag(right, r.y + r.h * 0.5, i18n::t("CARD", "CARTE"), Color { r: 0.48, g: 0.88, b: 0.58, a: 1.0 });
-        }
+        txt(&text, p.x + 30.0, cy, size, color);
+        cy += line_h;
     }
 }
 
 // ------------------------------------------------------------------- modals
 
-fn draw_buy(g: &mut Game) {
-    let pos = g.players[g.turn].pos;
-    let name = g.spaces[pos].name;
-    let price = g.spaces[pos].price as i64;
-    let rent = g.spaces[pos].rent[0] as i64;
-    let house = g.spaces[pos].house_cost as i64;
-    let kind = g.spaces[pos].kind;
-    let group = g.spaces[pos].group;
-    let cash = g.players[g.turn].cash;
-
-    let r = modal_rect(500.0, 330.0);
-    let content = modal_shell(r, i18n::t("UNOWNED PROPERTY", "PROPRIÉTÉ LIBRE"));
-    draw_rectangle(content.x, content.y, content.w, 9.0, if kind == Kind::Street { group.color() } else { MUTED });
-    centered_bold(name, r.x + r.w * 0.5, content.y + 38.0, 23.0, TEXT);
-    centered_bold(&format!("{} {}", i18n::t("Price", "Prix"), money(price)), r.x + r.w * 0.5, content.y + 72.0, 18.0, ACCENT);
-    if kind == Kind::Street {
-        txt(&format!("{} {}", i18n::t("Base rent", "Loyer de base"), money(rent)), r.x + 34.0, content.y + 108.0, 13.0, TEXT_DIM);
-        txt(&format!("{} {}", i18n::t("Building", "Construction"), money(house)), r.x + 258.0, content.y + 108.0, 13.0, TEXT_DIM);
-        txt(
-            &format!("{} {}", i18n::t("Group", "Groupe"), group_title(group)),
-            r.x + 34.0,
-            content.y + 130.0,
-            13.0,
-            TEXT_DIM,
-        );
-    } else if kind == Kind::Railroad {
-        txt(i18n::t("Rent 25 / 50 / 100 / 200", "Loyer 25 / 50 / 100 / 200"), r.x + 34.0, content.y + 108.0, 13.0, TEXT_DIM);
-        txt(i18n::t("Depends on how many you own", "Selon le nombre que vous possédez"), r.x + 34.0, content.y + 130.0, 12.0, MUTED);
-    } else {
-        txt(i18n::t("Rent is 4x or 10x the dice", "Loyer de 4x ou 10x les dés"), r.x + 34.0, content.y + 108.0, 13.0, TEXT_DIM);
+/// Title deed of the property being offered, laid over the board.
+fn draw_deed_card(g: &Game, lay: &Layout) {
+    let geo = &lay.geo;
+    let space = &g.spaces[g.players[g.turn].pos];
+    if !space.purchasable() {
+        return;
     }
-    txt(
-        &format!("{} {}", i18n::t("Your cash:", "Votre argent :"), money(cash)),
-        r.x + 34.0,
-        content.y + 168.0,
-        13.0,
-        MUTED,
+    let w = (geo.s * 0.31).max(150.0);
+    let h = (geo.s * 0.40).max(180.0);
+    let x = geo.x + geo.s * 0.105;
+    let y = geo.y + geo.s * 0.195;
+
+    draw_rectangle(x + 5.0, y + 7.0, w, h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.22 });
+    draw_rectangle(x, y, w, h, TILE);
+    draw_rectangle_lines(x, y, w, h, 1.5, INK_LINE);
+
+    let head_h = h * 0.30;
+    draw_rectangle(x, y, w, head_h, space.group.color());
+    draw_rectangle_lines(x, y, w, head_h, 1.2, INK_LINE);
+    spaced_center(
+        i18n::t("TITLE DEED", "TITRE DE PROPRIÉTÉ"),
+        x + w * 0.5,
+        y + head_h * 0.26,
+        w * 0.058,
+        w * 0.006,
+        INK,
     );
+    let mut name_size = w * 0.115;
+    while serif_w(space.name, name_size) > w - 20.0 && name_size > 8.0 {
+        name_size -= 0.5;
+    }
+    serif_center(space.name, x + w * 0.5, y + head_h * 0.66, name_size, INK);
 
-    let by = r.y + r.h - 64.0;
-    if button(
-        Rect::new(r.x + 26.0, by, 216.0, 44.0),
-        &crate::tr!("BUY {}", "ACHETER {}", money(price)),
-        cash >= price,
-        true,
-    ) {
-        g.buy();
+    let line = (h - head_h - 46.0) / 6.0;
+    let mut ry = y + head_h + line * 0.9;
+    let rows: [(String, u32); 6] = if space.group.street() {
+        [
+            (i18n::t("Rent", "Loyer").to_string(), space.rent[0]),
+            (crate::tr!("With 1 house", "Avec 1 maison"), space.rent[1]),
+            (crate::tr!("With 2 houses", "Avec 2 maisons"), space.rent[2]),
+            (crate::tr!("With 3 houses", "Avec 3 maisons"), space.rent[3]),
+            (crate::tr!("With 4 houses", "Avec 4 maisons"), space.rent[4]),
+            (i18n::t("With a hotel", "Avec un hôtel").to_string(), space.rent[5]),
+        ]
+    } else {
+        [
+            (i18n::t("Price", "Prix").to_string(), space.price),
+            (i18n::t("Rent", "Loyer").to_string(), space.rent[0]),
+            (String::new(), 0),
+            (String::new(), 0),
+            (String::new(), 0),
+            (String::new(), 0),
+        ]
+    };
+    for (label, value) in rows {
+        if label.is_empty() {
+            ry += line;
+            continue;
+        }
+        txt(&label, x + 14.0, ry, w * 0.062, INK);
+        text_r_bold(
+            &format!("{}$", value),
+            x + w - 14.0,
+            ry,
+            w * 0.062,
+            INK_SOFT,
+        );
+        draw_line(
+            x + 12.0,
+            ry + line * 0.28,
+            x + w - 12.0,
+            ry + line * 0.28,
+            1.0,
+            INK_LINE,
+        );
+        ry += line;
     }
-    if button(Rect::new(r.x + 258.0, by, 216.0, 44.0), i18n::t("AUCTION IT", "METTRE AUX ENCHÈRES"), true, false) {
-        g.start_auction_current();
-    }
+    centered(
+        &crate::tr!(
+            "Price {} · house {} each",
+            "Prix {} · maison {} chacune",
+            money(space.price as i64),
+            money(space.house_cost as i64)
+        ),
+        x + w * 0.5,
+        y + h - 26.0,
+        w * 0.052,
+        INK_SOFT,
+    );
 }
 
 fn draw_auction(g: &mut Game) {
@@ -1770,7 +2303,8 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
     let start = ui.asset_page * per_page;
     let slice: Vec<usize> = tiles.iter().skip(start).take(per_page).copied().collect();
 
-    let r = modal_rect(820.0, 660.0);
+    let rows_used = (((slice.len().max(1) + 1) / 2).min(8)) as f32;
+    let r = modal_rect(820.0, (270.0 + rows_used * 48.0).max(320.0));
     let title = crate::tr!("BUILD & MORTGAGE - {}", "CONSTRUIRE & HYPOTHÉQUER - {}", name);
     let content = modal_shell(r, &title);
     txt(
