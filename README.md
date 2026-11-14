@@ -8,6 +8,8 @@ font (SIL Open Font License) used for readable, accented text.
 
 Base repository: <https://github.com/crazypoly/crazypoly>
 
+![CrazyPoly in play](docs/board.png)
+
 ## Features
 
 - **1 to 8 players** on one shared screen (hot-seat), with an **AI bot** toggle for
@@ -57,6 +59,21 @@ Base repository: <https://github.com/crazypoly/crazypoly>
 - Animated token movement, hover tooltips on every tile, live game log.
 - A layout that fills the window: the square board is sized to the window height
   and the side panel absorbs the remaining width (scaled fonts, no dead space).
+
+## Screenshots
+
+The setup screen - 2 to 8 seats, each one HUMAN or BOT, a token design per seat
+and the FR / EN switch:
+
+![Setup screen](docs/setup.png)
+
+A throw in progress: the cubes tumble, bounce and land, and the upper face of
+each one is the result (`6 + 4 = 10` here). Once they have stopped they hop back
+to their home spots, still showing the face they landed on:
+
+| Mid-throw | At rest |
+| --- | --- |
+| ![Dice in flight](docs/throw.png) | ![Dice at rest](docs/dice.png) |
 
 ## Requirements
 
