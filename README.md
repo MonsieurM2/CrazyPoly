@@ -29,13 +29,19 @@ every seat be a bot and watch it play itself:
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
   plus the dice at the centre of the board.
-- A **main menu** with **NEW GAME**, **CONTINUE** (the saved game), and the
-  **RULES** of the game in two columns; the language and sound switches sit in
-  the corner. In game, the **MENU** button at the top of the log asks once and
+- An **animated main menu**: gold dust drifts up over the felt, the rings behind
+  the card breathe, the title carries a pulsing halo, the eight tokens float in a
+  row and a sheen runs across **NEW GAME**. It offers **NEW GAME**, **CONTINUE**
+  (the saved game) and the rules of the game; the language and sound switches sit
+  in the corner. In game, the **MENU** button at the top of the log asks once and
   takes you back to it.
-- **Rules at any time**: a **RÈGLES / RULES** button - on the menu and in the
-  right-hand column during play - opens the twelve rules of the table over a
-  dimmed board, and closes on the same click.
+- **A real rulebook**: **RULES / RÈGLES** - on the menu, and at the bottom left
+  of the board during play - opens a six-page booklet on cream paper, set in two
+  balanced columns with boxed worked examples: the goal, the setup, a turn, the
+  bank and the board, rent and colour groups, houses and hotels, mortgaging,
+  jail, the cards, auctions, trades, debt and bankruptcy, ending a game by
+  agreement. Turn the pages with the arrows or the keyboard, jump with the dots;
+  the world behind it freezes until you close it.
 - Full rules engine:
   - dice rolling, doubles (and the third-doubles jail rule), GO salary
   - property purchase, rent (including the monopoly double-rent rule),
@@ -49,12 +55,13 @@ every seat be a bot and watch it play itself:
     repairs, payments to/from every player, Get Out of Jail Free)
   - **auctions** when a player declines to buy
   - **trading**: properties plus cash, offered to a human or a bot, which
-    evaluates the deal
+    evaluates the deal; bots open trades **between themselves** too
   - **debt and bankruptcy**: sell buildings and mortgage lots to cover a debt,
     or declare bankruptcy; assets pass to the creditor (or the bank) and the
     last solvent player wins
-  - **ending a game early**: anyone can call the vote from **END GAME**. Every
-    human has to agree (bots always do); the ranking is by **net worth** -
+  - **ending a game early**: anyone can call the vote from **END GAME** at any
+    moment, even in the middle of a bot's turn. Every human has to agree (bots
+    always do); the ranking is by **net worth** -
     cash plus the price of every deed plus its buildings - so the player who
     would have won the long game wins here too
 - **French and English** interface, switchable at any time with the **FR / EN**
@@ -62,7 +69,9 @@ every seat be a bot and watch it play itself:
   names stay in English to match the classic board.
 - Bots buy, bid, build, raise cash and answer trade offers on their own. They also
   **start trades**: when a bot holds two lots of a colour group it offers cash for
-  the third, and a human on that seat can accept or decline.
+  the third. A human on that seat gets the usual trade window; another bot prices
+  the deal, and when the two agree the lots and the cash change hands on the spot,
+  with the exchange printed in the log.
 - **Save and load** a game in progress (one slot, plain JSON) plus a prebuilt
   Windows executable in `dist/`.
 - **Physical dice**: every roll is a real rigid-body simulation run with the
@@ -119,7 +128,8 @@ still showing the face they landed on:
 
 ![The dice tumbling](docs/dice.gif)
 
-The rules of the table, one click from the menu or from the board:
+The rulebook - six pages, two columns, worked examples in boxes - one click from
+the menu or from the bottom-left corner of the board:
 
 ![The rules](docs/rules.png)
 
@@ -200,9 +210,9 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
 
 ## Saving and loading
 
-- **SAVE** in the right-hand column writes the current game at the start or end of your
-  turn (it is disabled while dice are moving, a card is being resolved, or an
-  auction/debt dialog is open).
+- **SAUVEGARDER / SAVE**, next to **END GAME** in the right-hand column, writes
+  the current game at the start or end of your turn (it is disabled while dice
+  are moving, a card is being resolved, or an auction/debt dialog is open).
 - On the setup screen, **CONTINUE GAME** resumes the saved game. It is disabled
   when no save exists.
 - The slot lives at `%APPDATA%\Crazyopoly\savegame.json` on Windows and
@@ -220,7 +230,7 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
    game - bots fill any seat you leave to them. Set **every** seat to BOT and the
    game plays itself, which is handy to watch the AI (and the dice) at work.
 2. Press **START GAME**.
-3. On your turn press **ROLL DICE**. Your token walks around the board; the
+3. On your turn press **ROLL THE DICE**. Your token walks around the board; the
    `>>>` button below the player list fast-forwards the animations (and the
    bots) whenever you want to speed things up.
 4. When you land on an unowned property, choose **BUY** or **PASS** (which puts

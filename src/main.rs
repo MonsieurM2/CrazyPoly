@@ -85,6 +85,7 @@ async fn main() {
         // Clamp dt so dragging the window never teleports tokens.
         let dt = get_frame_time().min(0.05);
         if let Some(game) = app.game.as_mut() {
+            game.paused = app.ui.rules_open || app.ui.vote_open || app.ui.quit_confirm;
             game.update(dt);
         }
         ui::frame(&mut app);

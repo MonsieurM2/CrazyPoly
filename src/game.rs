@@ -131,6 +131,7 @@ impl Auction {
     }
 }
 
+#[derive(Clone)]
 pub struct Trade {
     /// Who proposed the deal.
     pub from: usize,
@@ -188,6 +189,8 @@ pub struct Game {
     pub pending_mod: LandingMod,
     pub pending_jail_steps: usize,
     pub ai_timer: f32,
+    /// Set while a dialog covers the board: the world holds still.
+    pub paused: bool,
     pub trade_timer: f32,
     /// Set once a bot has offered a trade during its current turn.
     pub bot_offer_done: bool,
@@ -216,6 +219,7 @@ impl Game {
             hotels_left: START_HOTELS,
             anim: None,
             auction: None,
+            paused: false,
             trade: None,
             debt: None,
             banner: None,
@@ -1482,17 +1486,65 @@ impl Game {
             let Some(owner) = self.props[target].owner else {
                 continue;
             };
-            if self.players[owner].ai || self.players[owner].bankrupt {
+            if self.players[owner].bankrupt {
                 continue;
             }
             let price = self.spaces[target].price as i64;
+            let name = self.spaces[target].name;
+            let bot = self.pname(p);
+            if self.players[owner].ai {
+                // Two bots settle on the spot: raise the offer step by step, but
+                // never above what we can spare nor 2.5x the list price.
+                let cap = (self.players[p].cash - 200).min(price * 9 / 2);
+                let step = (price / 6).max(25);
+                let mut asked = (price * 2).min(cap);
+                let mut accepted = false;
+                while asked >= price / 2 && asked <= cap {
+                    self.trade = Some(Trade {
+                        from: p,
+                        to: owner,
+                        give: Vec::new(),
+                        get: vec![target],
+                        give_cash: asked,
+                        get_cash: 0,
+                        state: TradeState::Proposed,
+                        notice: String::new(),
+                    });
+                    accepted = crate::ai::evaluate_trade(self);
+                    self.trade = None;
+                    if accepted {
+                        break;
+                    }
+                    asked += step;
+                }
+                if !accepted {
+                    continue;
+                }
+                self.log(crate::tr!(
+                    "{} offers ${} for {}.",
+                    "{} propose {} $ pour {}.",
+                    bot,
+                    asked,
+                    name
+                ));
+                self.trade = Some(Trade {
+                    from: p,
+                    to: owner,
+                    give: Vec::new(),
+                    get: vec![target],
+                    give_cash: asked,
+                    get_cash: 0,
+                    state: TradeState::Proposed,
+                    notice: String::new(),
+                });
+                self.accept_trade();
+                return true;
+            }
             let offer = ((price as f64) * 1.7) as i64;
             let offer = offer.min(self.players[p].cash - 200);
             if offer < price / 2 {
                 continue;
             }
-            let name = self.spaces[target].name;
-            let bot = self.pname(p);
             self.trade = Some(Trade {
                 from: p,
                 to: owner,
@@ -1643,6 +1695,9 @@ impl Game {
     }
 
     pub fn update(&mut self, dt: f32) {
+        if self.paused {
+            return;
+        }
         if let Some(b) = self.banner.as_mut() {
             b.1 -= dt;
         }
