@@ -106,9 +106,10 @@ every seat be a bot and watch it play itself:
   human or bot, can be called whatever you like.
 - Animated token movement, hover tooltips on every tile, live game log.
 - A **pause menu** on **Escape**: the whole table freezes - dice, animations,
-  bots and all - and offers **RESUME**, **SAVE**, the rulebook and **END THE GAME**.
-  It can be opened at any moment, including while a bot is playing, and the same
-  command sits as a button in the bottom-left bar.
+  bots and all, even in the middle of a throw - and offers **RESUME**, **SAVE**,
+  the rulebook, **END THE GAME** and **MAIN MENU**. It can be opened at any
+  moment, including while a bot is playing, and the same command sits as a
+  button in the bottom-left bar.
 - A **three-column layout** that fills the window: the square board in the middle,
   the players on the left, the current instruction, the action buttons and the
   game log on the right. Buying is decided right there - the
@@ -156,9 +157,13 @@ end-of-game vote, the final ranking and the token picker.
 | --- | --- |
 | ![The vote to end the game](docs/vote.png) | ![Game over, ranked by net worth](docs/over.png) |
 
-| Hover any tile for its deed | Eight token designs |
+| Several saves, one picker | Hover any tile for its deed |
 | --- | --- |
-| ![A title deed on hover](docs/hover.png) | ![Choosing a token](docs/tokens.png) |
+| ![The save picker](docs/load.png) | ![A title deed on hover](docs/hover.png) |
+
+Eight token designs, drawn with primitives:
+
+![Choosing a token](docs/tokens.png)
 
 ## Sound
 
@@ -216,11 +221,17 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
 - **SAVE / SAUVEGARDER**, in the pause menu, writes the current game at any
   point where nothing is moving (it is disabled while dice are tumbling, a card
   is being resolved, or an auction/debt dialog is open).
-- On the setup screen, **CONTINUE GAME** resumes the saved game. It is disabled
-  when no save exists.
-- The slot lives at `%APPDATA%\Crazyopoly\savegame.json` on Windows and
-  `~/.local/share/Crazyopoly/savegame.json` elsewhere. Set the `CRAZYOPOLY_SAVE`
-  environment variable to any file path to use a different location.
+- **Several games at once**: every save gets its own slot, and the eight most
+  recent are kept. **CONTINUE / REPRENDRE** - on the menu and on the setup
+  screen - resumes the only save straight away, and opens a picker when there
+  are several, each row showing how old it is, how many seats it holds and whose
+  turn it was.
+- The slots live in `%APPDATA%\Crazyopoly\saves` on Windows and
+  `~/.local/share/Crazyopoly/saves` elsewhere; a save written by an earlier
+  version in `savegame.json` is folded into that folder on first use. Set the
+  `CRAZYOPOLY_SAVE` environment variable to a folder to keep the slots elsewhere
+  (a path ending in `.json` is understood as the folder of the same name, so old
+  shortcuts keep working).
 - The save holds players, cash, deeds, buildings, mortgages, the bank supply,
   turn order, dice and both card decks in their current order.
 

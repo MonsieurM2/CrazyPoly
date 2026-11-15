@@ -566,6 +566,12 @@ pub struct Ui {
     pub rules_page: usize,
     /// Escape menu: the whole table holds still while it is open.
     pub pause_open: bool,
+    /// Save picker: open when several saves compete for CONTINUE.
+    pub load_open: bool,
+    pub load_list: Vec<crate::persist::SaveInfo>,
+    pub load_note: String,
+    /// The click that opened the picker must not pick a save.
+    pub load_armed: bool,
     /// Vote to end the game early: one "agreed" flag per seat.
     pub vote_open: bool,
     pub vote_agree: Vec<bool>,
@@ -582,6 +588,10 @@ impl Ui {
             rules_open: false,
             rules_page: 0,
             pause_open: false,
+            load_open: false,
+            load_list: Vec::new(),
+            load_note: String::new(),
+            load_armed: false,
             vote_open: false,
             vote_agree: Vec::new(),
             quit_confirm: false,
@@ -689,7 +699,7 @@ fn draw_setup(app: &mut App) {
     let x = (sw - w) * 0.5;
     let y = (sh - h) * 0.5;
     // While the token picker is open it owns every click.
-    let picker_open = app.setup.token_slot.is_some();
+    let picker_open = app.setup.token_slot.is_some() || app.ui.load_open;
 
     round_card(x, y, w, h, 16.0, PANEL_BG, CARD_EDGE);
     serif_center("Crazyopoly", x + w * 0.5, y + 46.0, 50.0, GOLD_SOFT);
@@ -942,7 +952,7 @@ fn draw_setup(app: &mut App) {
         app.ui = Ui::new();
         app.screen = Screen::Play;
     }
-    let has_save = crate::persist::has_save();
+    let has_save = crate::persist::has_saves();
     if !picker_open
         && button(
             Rect::new(x + w * 0.5 + 6.0, start_y, btn_w, 50.0),
@@ -951,27 +961,37 @@ fn draw_setup(app: &mut App) {
             false,
         )
     {
-        match crate::persist::load() {
-            Ok(game) => {
-                app.setup.error.clear();
-                app.game = Some(game);
-                app.ui = Ui::new();
-                app.screen = Screen::Play;
-            }
-            Err(err) => app.setup.error = format!("{}: {}", i18n::t("Load failed", "Échec du chargement"), err),
+        if let Some(game) = open_saves(&mut app.ui) {
+            app.setup.error.clear();
+            app.game = Some(game);
+            app.ui = Ui::new();
+            app.screen = Screen::Play;
+        } else if !app.ui.load_open {
+            app.setup.error = i18n::t("Load failed", "Échec du chargement").to_string();
         }
     }
+    let saves = crate::persist::list();
+    let note = if saves.is_empty() {
+        i18n::t("Save folder: ", "Dossier des sauvegardes : ").to_string()
+            + &crate::persist::saves_dir().display().to_string()
+    } else {
+        crate::tr!(
+            "{} save(s) in {}",
+            "{} sauvegarde(s) dans {}",
+            saves.len(),
+            crate::persist::saves_dir().display()
+        )
+    };
     centered(
-        &format!(
-            "{} {}",
-            i18n::t("Save slot:", "Sauvegarde :"),
-            crate::persist::save_path().display()
-        ),
+        &truncate(&note, w - 40.0, 10.0),
         x + w * 0.5,
         y + h - 44.0,
         10.0,
         MUTED,
     );
+    if app.ui.load_open {
+        draw_load(app);
+    }
     if let Some(slot) = app.setup.token_slot {
         // Ignore the click that opened the picker: it belongs to the setup row.
         draw_token_picker(app, slot, picker_open);
@@ -1154,9 +1174,8 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
     if g.phase == Phase::Over {
         return Modal::Over;
     }
-    if g.dice_anim > 0.0 {
-        return Modal::Waiting;
-    }
+    // The book and the vote can be opened from the pause menu, so they sit
+    // above it; the quit question too, or leaving would go unseen.
     if ui.rules_open {
         return Modal::Rules;
     }
@@ -1166,8 +1185,12 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
     if ui.quit_confirm {
         return Modal::Quit;
     }
+    // The pause menu opens even mid-roll: the table is frozen, dice and all.
     if ui.pause_open {
         return Modal::Pause;
+    }
+    if g.dice_anim > 0.0 {
+        return Modal::Waiting;
     }
     if ui.asset_open {
         return Modal::Assets;
@@ -3189,7 +3212,8 @@ fn draw_menu(app: &mut App) {
     let sw = screen_width();
     let sh = screen_height();
     let cx = sw * 0.5;
-    let locked = app.ui.rules_open;
+    // The rulebook and the save picker both take every click while open.
+    let locked = app.ui.rules_open || app.ui.load_open;
     let t = get_time() as f32;
 
     // Gilt frame and a quiet lattice of lines, like the edge of a board.
@@ -3276,7 +3300,7 @@ fn draw_menu(app: &mut App) {
         app.screen = Screen::Setup;
     }
     by += bh + gap;
-    let has_save = crate::persist::has_save();
+    let has_save = crate::persist::has_saves();
     if !locked
         && button(
             Rect::new(x + 18.0, by, w - 36.0, bh),
@@ -3285,7 +3309,7 @@ fn draw_menu(app: &mut App) {
             false,
         )
     {
-        if let Ok(game) = crate::persist::load() {
+        if let Some(game) = open_saves(&mut app.ui) {
             app.game = Some(game);
             app.ui = Ui::new();
             app.screen = Screen::Play;
@@ -3381,6 +3405,9 @@ fn draw_menu(app: &mut App) {
 
     if app.ui.rules_open {
         draw_rules(&mut app.ui);
+    }
+    if app.ui.load_open {
+        draw_load(app);
     }
 }
 
@@ -3651,7 +3678,7 @@ fn paper_button(r: Rect, label: &str, enabled: bool) -> bool {
 }
 
 fn draw_pause(g: &mut Game, ui: &mut Ui) {
-    let r = modal_rect(560.0, 404.0);
+    let r = modal_rect(560.0, 470.0);
     let body = modal_shell(r, i18n::t("PAUSED", "PAUSE"));
     let gap = 12.0;
     let h = 48.0;
@@ -3707,6 +3734,15 @@ fn draw_pause(g: &mut Game, ui: &mut Ui) {
         ui.vote_open = true;
         ui.vote_agree = g.players.iter().map(|player| player.ai).collect();
     }
+    y += h + gap;
+    if button(
+        Rect::new(body.x, y, body.w, h),
+        i18n::t("MAIN MENU", "MENU PRINCIPAL"),
+        true,
+        false,
+    ) {
+        ui.quit_confirm = true;
+    }
     y += h + gap + 4.0;
     centered(
         i18n::t(
@@ -3718,6 +3754,118 @@ fn draw_pause(g: &mut Game, ui: &mut Ui) {
         11.5,
         MUTED,
     );
+}
+
+/// Loads the only save straight away, or opens the picker when there is a
+/// choice to make.
+fn open_saves(ui: &mut Ui) -> Option<Game> {
+    let slots = crate::persist::list();
+    if slots.is_empty() {
+        return None;
+    }
+    if slots.len() == 1 {
+        return crate::persist::load_at(&slots[0].path).ok();
+    }
+    ui.load_list = slots;
+    ui.load_note.clear();
+    ui.load_armed = false;
+    ui.load_open = true;
+    None
+}
+
+fn ago_label(secs: u64) -> String {
+    if secs < 60 {
+        i18n::t("just now", "à l'instant").to_string()
+    } else if secs < 3600 {
+        crate::tr!("{} min ago", "il y a {} min", secs / 60)
+    } else if secs < 86_400 {
+        crate::tr!("{} h ago", "il y a {} h", secs / 3600)
+    } else {
+        crate::tr!("{} d ago", "il y a {} j", secs / 86_400)
+    }
+}
+
+fn draw_load(app: &mut App) {
+    let rows = app.ui.load_list.len().min(8);
+    let r = modal_rect(700.0, 176.0 + rows as f32 * 60.0);
+    let content = modal_shell(r, i18n::t("LOAD A GAME", "CHARGER UNE PARTIE"));
+    // The click that opened the picker belongs to the button behind it.
+    let armed = app.ui.load_armed;
+    app.ui.load_armed = true;
+    let (mx, my) = mouse_position();
+    let mut chosen = None;
+    let mut y = content.y + 2.0;
+    for slot in app.ui.load_list.iter().take(rows) {
+        let row = Rect::new(content.x, y, content.w, 52.0);
+        let hover = inr(row, mx, my);
+        round_card(
+            row.x,
+            row.y,
+            row.w,
+            row.h,
+            10.0,
+            if hover {
+                Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 }
+            } else {
+                CARD
+            },
+            if hover { GOLD } else { CARD_EDGE },
+        );
+        txt(
+            &ago_label(slot.age_secs()),
+            row.x + 16.0,
+            row.y + 21.0,
+            13.0,
+            GOLD_SOFT,
+        );
+        let seats = crate::tr!(
+            "{} players",
+            "{} joueurs",
+            slot.players
+        );
+        let seats = crate::tr!("{}", "{}", seats);
+        let seats_w = text_w(&seats, 12.0);
+        txt(&seats, row.x + row.w - 16.0 - seats_w, row.y + 21.0, 12.0, CREAM_DIM);
+        let who = crate::tr!(
+            "{} - {}'s turn",
+            "{} - tour de {}",
+            truncate(&slot.names.join(", "), row.w - 190.0, 12.5),
+            slot.current_name()
+        );
+        txt(&who, row.x + 16.0, row.y + 40.0, 12.5, CREAM);
+        if armed && hover && is_mouse_button_pressed(MouseButton::Left) {
+            chosen = Some(slot.path.clone());
+        }
+        y += 60.0;
+    }
+    if let Some(path) = chosen {
+        match crate::persist::load_at(&path) {
+            Ok(game) => {
+                app.game = Some(game);
+                app.ui = Ui::new();
+                app.screen = Screen::Play;
+                return;
+            }
+            Err(err) => app.ui.load_note = err,
+        }
+    }
+    if !app.ui.load_note.is_empty() {
+        centered(
+            &truncate(&app.ui.load_note, content.w, 11.5),
+            content.x + content.w * 0.5,
+            r.y + r.h - 34.0,
+            11.5,
+            Color { r: 0.902, g: 0.529, b: 0.443, a: 1.0 },
+        );
+    }
+    if button(
+        Rect::new(content.x + content.w - 150.0, r.y + r.h - 60.0, 128.0, 36.0),
+        i18n::t("CANCEL", "ANNULER"),
+        armed,
+        false,
+    ) {
+        app.ui.load_open = false;
+    }
 }
 
 fn draw_vote(g: &mut Game, ui: &mut Ui) {

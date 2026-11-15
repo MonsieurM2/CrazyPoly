@@ -8,6 +8,7 @@
 
 use std::fs;
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use macroquad::prelude::Color;
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,21 @@ use crate::game::{Game, Phase, Player, Prop, PLAYER_COLORS};
 
 const SAVE_VERSION: u32 = 1;
 const SAVE_FILE: &str = "savegame.json";
+const SAVE_PREFIX: &str = "save-";
+const MAX_SAVES: usize = 8;
+
+/// The few fields the picker reads, so listing a save does not depend on the
+/// rest of the format.
+#[derive(Deserialize)]
+struct SummaryPlayer {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct SaveSummary {
+    players: Vec<SummaryPlayer>,
+    turn: usize,
+}
 
 #[derive(Serialize, Deserialize)]
 struct SavedPlayer {
@@ -273,8 +289,8 @@ impl SavedGame {
     }
 }
 
-/// Folder holding the save slot. Uses the platform's application data folder
-/// so the game works no matter where the executable lives.
+/// Folder holding this player's data. Uses the platform's application data
+/// folder so the game works no matter where the executable lives.
 pub fn save_dir() -> PathBuf {
     if cfg!(windows) {
         if let Ok(appdata) = std::env::var("APPDATA") {
@@ -292,40 +308,163 @@ pub fn save_dir() -> PathBuf {
     PathBuf::from(".")
 }
 
-pub fn save_path() -> PathBuf {
-    // CRAZYOPOLY_SAVE lets you keep the save file somewhere else (portable
-    // installs, tests). Otherwise the platform data folder is used.
+/// Folder holding the save slots. `CRAZYOPOLY_SAVE` points it somewhere else
+/// (portable installs, tests); a path ending in `.json` names the folder after
+/// that file, so an old single-save path keeps working.
+pub fn saves_dir() -> PathBuf {
     if let Ok(custom) = std::env::var("CRAZYOPOLY_SAVE") {
         if !custom.trim().is_empty() {
-            return PathBuf::from(custom);
+            let path = PathBuf::from(custom);
+            let is_json = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("json"))
+                .unwrap_or(false);
+            return if is_json {
+                path.with_extension("")
+            } else {
+                path
+            };
         }
     }
-    save_dir().join(SAVE_FILE)
+    save_dir().join("saves")
 }
 
-pub fn has_save() -> bool {
-    save_path().is_file()
+/// The one-file layout of earlier versions: folded into the slot folder the
+/// first time the game looks at its saves.
+fn migrate_legacy() {
+    let legacy = save_dir().join(SAVE_FILE);
+    if !legacy.is_file() {
+        return;
+    }
+    let dir = saves_dir();
+    if fs::create_dir_all(&dir).is_err() {
+        return;
+    }
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let _ = fs::rename(&legacy, dir.join(format!("{SAVE_PREFIX}{stamp}.json")));
 }
 
+fn stamp_of(path: &PathBuf) -> u64 {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|n| n.strip_prefix(SAVE_PREFIX))
+        .and_then(|n| n.strip_suffix(".json"))
+        .and_then(|n| n.parse::<u64>().ok())
+        .unwrap_or(0)
+}
+
+/// One save on disk, with what the picker needs to describe it.
+pub struct SaveInfo {
+    pub path: PathBuf,
+    /// Milliseconds since the epoch, taken from the slot name.
+    pub saved_at: u64,
+    pub players: usize,
+    pub turn: usize,
+    pub names: Vec<String>,
+}
+
+impl SaveInfo {
+    pub fn current_name(&self) -> String {
+        self.names.get(self.turn).cloned().unwrap_or_default()
+    }
+
+    /// Whole seconds, for a "three hours ago" style label.
+    pub fn age_secs(&self) -> u64 {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        now.saturating_sub(self.saved_at) / 1000
+    }
+}
+
+/// Every save on disk, newest first.
+pub fn list() -> Vec<SaveInfo> {
+    migrate_legacy();
+    let dir = saves_dir();
+    let mut out = Vec::new();
+    let Ok(entries) = fs::read_dir(&dir) else {
+        return out;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let is_json = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("json"))
+            .unwrap_or(false);
+        if !is_json {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(summary) = serde_json::from_str::<SaveSummary>(&text) else {
+            continue;
+        };
+        if summary.players.is_empty() || summary.players.len() > 8 {
+            continue;
+        }
+        out.push(SaveInfo {
+            saved_at: stamp_of(&path),
+            players: summary.players.len(),
+            turn: summary.turn.min(summary.players.len() - 1),
+            names: summary.players.into_iter().map(|p| p.name).collect(),
+            path,
+        });
+    }
+    out.sort_by(|a, b| b.saved_at.cmp(&a.saved_at));
+    out
+}
+
+pub fn has_saves() -> bool {
+    !list().is_empty()
+}
+
+/// Writes the game to a fresh slot and keeps the newest `MAX_SAVES`.
 pub fn save(game: &Game) -> Result<PathBuf, String> {
     let data = SavedGame::from_game(game)?;
-    let path = save_path();
-    if let Some(dir) = path.parent() {
-        fs::create_dir_all(dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
+    migrate_legacy();
+    let dir = saves_dir();
+    fs::create_dir_all(&dir).map_err(|e| format!("{}: {}", dir.display(), e))?;
+    let mut stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let mut path = dir.join(format!("{SAVE_PREFIX}{stamp}.json"));
+    // Two saves in the same millisecond are unlikely, not impossible.
+    while path.exists() {
+        stamp += 1;
+        path = dir.join(format!("{SAVE_PREFIX}{stamp}.json"));
     }
     let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| format!("{}: {}", path.display(), e))?;
+
+    let mut slots = list();
+    if slots.len() > MAX_SAVES {
+        for old in slots.split_off(MAX_SAVES) {
+            let _ = fs::remove_file(old.path);
+        }
+    }
     Ok(path)
 }
 
-pub fn load() -> Result<Game, String> {
-    let path = save_path();
-    let text =
-        fs::read_to_string(&path).map_err(|e| format!("{}: {}", path.display(), e))?;
-    let data: SavedGame =
-        serde_json::from_str(&text).map_err(|e| {
-            format!("{}: {}", crate::i18n::t("Corrupt save", "Sauvegarde corrompue"), e)
-        })?;
+pub fn load_at(path: &std::path::Path) -> Result<Game, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("{}: {}", path.display(), e))?;
+    let data: SavedGame = serde_json::from_str(&text).map_err(|e| {
+        format!(
+            "{}: {}",
+            crate::i18n::t("Corrupt save", "Sauvegarde corrompue"),
+            e
+        )
+    })?;
     data.into_game()
 }
 
