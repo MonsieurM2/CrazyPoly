@@ -8,6 +8,7 @@
 use macroquad::prelude::*;
 
 use crate::ai;
+use crate::ai::Strategy;
 use crate::board::{self, Group, Kind, Space};
 use crate::cards::{self, Card, Deck, Effect};
 use crate::dice_physics::Throw;
@@ -88,6 +89,8 @@ pub struct Player {
     pub ai: bool,
     /// Token design index (see `tokens::COUNT`).
     pub token: usize,
+    /// Temperament of a bot seat (invisible unless the debug mode is on).
+    pub strategy: Strategy,
     /// Number of complete laps, shown in the UI.
     pub laps: u32,
 }
@@ -105,6 +108,7 @@ impl Player {
             bankrupt: false,
             ai,
             token: 0,
+            strategy: Strategy::default(),
             laps: 0,
         }
     }
@@ -231,6 +235,7 @@ impl Game {
             winner: None,
             fast: false,
         };
+        crate::ai::deal_strategies(&mut game);
         let first = game.players[0].name.clone();
         game.log(crate::tr!(
             "Welcome to Crazyopoly! {} goes first.",

@@ -48,6 +48,8 @@ struct SavedPlayer {
     ai: bool,
     #[serde(default)]
     token: usize,
+    #[serde(default)]
+    strategy: crate::ai::Strategy,
     laps: u32,
 }
 
@@ -142,6 +144,7 @@ impl SavedGame {
                 bankrupt: p.bankrupt,
                 ai: p.ai,
                 token: p.token,
+                strategy: p.strategy,
                 laps: p.laps,
             })
             .collect();
@@ -231,6 +234,7 @@ impl SavedGame {
             player.jail_cards = sp.jail_cards;
             player.bankrupt = sp.bankrupt;
             player.token = sp.token % crate::tokens::COUNT;
+            player.strategy = sp.strategy;
             player.laps = sp.laps;
             players.push(player);
         }

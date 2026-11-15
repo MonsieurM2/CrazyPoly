@@ -72,13 +72,22 @@ every seat be a bot and watch it play itself:
     cash plus the price of every deed plus its buildings - so the player who
     would have won the long game wins here too
 - **French and English** interface, switchable at any time with the **FR / EN**
-  button under the player list and on the setup screen. French is the default; street
-  names stay in English to match the classic board.
+  button on the setup screen, in the corner of the main menu, and at the foot of
+  the pause menu next to the debug switch. French is the default; street names
+  stay in English to match the classic board.
 - Bots buy, bid, build, raise cash and answer trade offers on their own. They also
   **start trades**: when a bot holds two lots of a colour group it offers cash for
   the third. A human on that seat gets the usual trade window; another bot prices
   the deal, and when the two agree the lots and the cash change hands on the spot,
   with the exchange printed in the log.
+- **Four bot temperaments**, dealt at random and different for every bot at the
+  table: the **builder** grabs lots that complete a colour group and builds at the
+  first chance, the **banker** keeps a deep cushion and bids hardest at auctions,
+  the **dealer** accepts near-equal trades to get the lots it wants, and the
+  **gambler** spends nearly everything and builds the tallest buildings first.
+  Nothing on screen says which is which during play - turn on the debug mode to
+  see them. `cargo test --release` plays forty all-bot games and fails if one of
+  the four never wins, so no temperament can quietly become a dead end.
 - **Save and load** a game in progress (one slot, plain JSON) plus a prebuilt
   Windows executable in `dist/`.
 - **Physical dice**: every roll is a real rigid-body simulation run with the
@@ -117,9 +126,13 @@ every seat be a bot and watch it play itself:
 - Animated token movement, hover tooltips on every tile, live game log.
 - A **pause menu** on **Escape**: the whole table freezes - dice, animations,
   bots and all, even in the middle of a throw - and offers **RESUME**, **SAVE**,
-  the rulebook, **END THE GAME** and **MAIN MENU**. It can be opened at any
-  moment, including while a bot is playing, and the same command sits as a
-  button in the bottom-left bar.
+  the rulebook, **END THE GAME** and **MAIN MENU**, with the **LANGUAGE** and
+  **DEBUG** switches side by side along its foot. It can be opened at any moment,
+  including while a bot is playing, and the same command sits as a button in the
+  bottom-left bar.
+- A **debug mode**, off by default and toggled from that pause menu: every bot's
+  card then carries its temperament and the numbers behind it (`keeps $0 - 4
+  house(s)/turn`), ready to show more as the bots grow.
 - A **three-column layout** that fills the window: the square board in the middle,
   the players on the left, the current instruction, the action buttons and the
   game log on the right. Buying is decided right there - the
@@ -170,6 +183,11 @@ end-of-game vote, the final ranking and the token picker.
 | Several saves, one picker | Hover any tile for its deed |
 | --- | --- |
 | ![The save picker](docs/load.png) | ![A title deed on hover](docs/hover.png) |
+
+The debug mode, from the pause menu, names every bot's temperament and puts its
+numbers on the player card:
+
+![The debug mode](docs/debug.png)
 
 Eight token designs, drawn with primitives:
 
@@ -295,7 +313,7 @@ src/
   cards.rs   bilingual Chance / Community Chest decks
   game.rs    rules engine and phase state machine
   i18n.rs    active language, `t()` and the `tr!` macro
-  ai.rs      computer players, including the trade offers they make
+  ai.rs      computer players: four temperaments, their decisions and the balance test
   dice.rs           replaying the recorded throw under a vertical camera
   dice_physics.rs   the throw itself: rapier3d world, recorded poses, face read-out
   tokens.rs  the eight player token designs, drawn with primitives

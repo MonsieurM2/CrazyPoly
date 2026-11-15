@@ -572,6 +572,8 @@ pub struct Ui {
     pub load_note: String,
     /// The click that opened the picker must not pick a save.
     pub load_armed: bool,
+    /// Shows the bot temperaments and their numbers over the table.
+    pub debug: bool,
     /// Vote to end the game early: one "agreed" flag per seat.
     pub vote_open: bool,
     pub vote_agree: Vec<bool>,
@@ -592,6 +594,7 @@ impl Ui {
             load_list: Vec::new(),
             load_note: String::new(),
             load_armed: false,
+            debug: false,
             vote_open: false,
             vote_agree: Vec::new(),
             quit_confirm: false,
@@ -1959,36 +1962,33 @@ fn draw_left_column(g: &mut Game, ui: &mut Ui, lay: &Layout) {
     let card_h = ((avail - gap * (n as f32 - 1.0)) / n as f32).clamp(50.0, 104.0);
     for i in 0..n {
         let r = Rect::new(p.x, top + i as f32 * (card_h + gap), p.w, card_h);
-        draw_player_card(g, i, r);
+        draw_player_card(g, i, r, ui.debug);
     }
 
     let bar = p.y + p.h - 30.0;
     if sound_button(Rect::new(p.x, bar, 34.0, 28.0), Icon::Pause, true) {
         ui.pause_open = true;
     }
-    if button(Rect::new(p.x + 42.0, bar, 38.0, 28.0), i18n::code(), true, false) {
-        i18n::toggle();
-    }
     if sound_button(
-        Rect::new(p.x + 88.0, bar, 28.0, 28.0),
+        Rect::new(p.x + 42.0, bar, 28.0, 28.0),
         Icon::Sfx,
         crate::audio::sfx_on(),
     ) {
         crate::audio::toggle_sfx();
     }
     if sound_button(
-        Rect::new(p.x + 120.0, bar, 28.0, 28.0),
+        Rect::new(p.x + 74.0, bar, 28.0, 28.0),
         Icon::Music,
         crate::audio::music_on(),
     ) {
         crate::audio::toggle_music();
     }
-    if toggle_button(Rect::new(p.x + 154.0, bar, 54.0, 28.0), ">>>", g.fast) {
+    if toggle_button(Rect::new(p.x + 108.0, bar, 54.0, 28.0), ">>>", g.fast) {
         g.fast = !g.fast;
     }
 }
 
-fn draw_player_card(g: &Game, index: usize, r: Rect) {
+fn draw_player_card(g: &Game, index: usize, r: Rect, debug: bool) {
     let player = &g.players[index];
     let current = index == g.turn && g.phase != Phase::Over;
     let fill = if player.bankrupt {
@@ -2054,6 +2054,18 @@ fn draw_player_card(g: &Game, index: usize, r: Rect) {
         11.0,
         if current { GOLD_SOFT } else { MUTED },
     );
+
+    // Debug mode: who this bot really is, and what it is hoarding.
+    if debug && player.ai {
+        let tag = player.strategy.label();
+        let tag_w = text_w(tag, 10.0);
+        if r.w > tag_w + 150.0 {
+            txt_bold(tag, r.x + r.w - 14.0 - tag_w, r.y + name_size + 24.5, 10.0, GOLD_DIM);
+        }
+        if r.h > 86.0 {
+            txt(&player.strategy.note(), text_x, r.y + name_size + 38.0, 9.5, MUTED);
+        }
+    }
 
     if r.h < 64.0 {
         return;
@@ -3810,7 +3822,7 @@ fn paper_button(r: Rect, label: &str, enabled: bool) -> bool {
 }
 
 fn draw_pause(g: &mut Game, ui: &mut Ui) {
-    let r = modal_rect(560.0, 470.0);
+    let r = modal_rect(560.0, 518.0);
     let body = modal_shell(r, i18n::t("PAUSED", "PAUSE"));
     let gap = 12.0;
     let h = 48.0;
@@ -3875,7 +3887,31 @@ fn draw_pause(g: &mut Game, ui: &mut Ui) {
     ) {
         ui.quit_confirm = true;
     }
-    y += h + gap + 4.0;
+    y += h + gap;
+    // Language and debug, side by side at the foot of the menu.
+    let half = (body.w - 10.0) * 0.5;
+    if button(
+        Rect::new(body.x, y, half, 34.0),
+        &format!("{} : {}", i18n::t("LANGUAGE", "LANGUE"), i18n::code()),
+        true,
+        false,
+    ) {
+        i18n::toggle();
+    }
+    let debug_label = if ui.debug {
+        i18n::t("ON", "OUI")
+    } else {
+        i18n::t("OFF", "NON")
+    };
+    if button(
+        Rect::new(body.x + half + 10.0, y, half, 34.0),
+        &format!("{} : {}", i18n::t("DEBUG", "DEBUG"), debug_label),
+        true,
+        ui.debug,
+    ) {
+        ui.debug = !ui.debug;
+    }
+    y += 34.0 + gap + 2.0;
     centered(
         i18n::t(
             "Escape closes this menu",
