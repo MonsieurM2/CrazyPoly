@@ -404,6 +404,7 @@ fn small_button(r: Rect, label: &str, enabled: bool) -> bool {
 enum Icon {
     Music,
     Sfx,
+    Pause,
 }
 
 /// A pill that stays lit while its option is on.
@@ -477,6 +478,10 @@ fn sound_button(r: Rect, icon: Icon, on: bool) -> bool {
             draw_rectangle(cx - 1.2, cy - 7.0, 1.8, 11.0, c);
             draw_rectangle(cx + 0.4, cy - 7.0, 5.2, 2.0, c);
             draw_circle(cx - 3.6, cy + 4.4, 3.2, c);
+        }
+        Icon::Pause => {
+            round_rect(cx - 5.0, cy - 6.5, 3.2, 13.0, 1.4, c);
+            round_rect(cx + 1.8, cy - 6.5, 3.2, 13.0, 1.4, c);
         }
         Icon::Sfx => {
             for (k, h) in [7.0f32, 12.0, 9.0].iter().enumerate() {
@@ -559,6 +564,8 @@ pub struct Ui {
     pub confirm_bankrupt: bool,
     pub rules_open: bool,
     pub rules_page: usize,
+    /// Escape menu: the whole table holds still while it is open.
+    pub pause_open: bool,
     /// Vote to end the game early: one "agreed" flag per seat.
     pub vote_open: bool,
     pub vote_agree: Vec<bool>,
@@ -574,6 +581,7 @@ impl Ui {
             confirm_bankrupt: false,
             rules_open: false,
             rules_page: 0,
+            pause_open: false,
             vote_open: false,
             vote_agree: Vec::new(),
             quit_confirm: false,
@@ -648,6 +656,21 @@ impl Setup {
 // ------------------------------------------------------------- entry point
 
 pub fn frame(app: &mut App) {
+    if is_key_pressed(KeyCode::Escape) {
+        if app.ui.rules_open {
+            app.ui.rules_open = false;
+        } else if app.ui.vote_open {
+            app.ui.vote_open = false;
+        } else if app.ui.quit_confirm {
+            app.ui.quit_confirm = false;
+        } else if app.ui.pause_open {
+            app.ui.pause_open = false;
+        } else if let (Screen::Play, Some(game)) = (app.screen, app.game.as_ref()) {
+            if game.phase != Phase::Over {
+                app.ui.pause_open = true;
+            }
+        }
+    }
     match app.screen {
         Screen::Menu => draw_menu(app),
         Screen::Setup => draw_setup(app),
@@ -1120,6 +1143,7 @@ enum Modal {
     Rules,
     Vote,
     Quit,
+    Pause,
 }
 
 fn buying(g: &Game) -> bool {
@@ -1141,6 +1165,9 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
     }
     if ui.quit_confirm {
         return Modal::Quit;
+    }
+    if ui.pause_open {
+        return Modal::Pause;
     }
     if ui.asset_open {
         return Modal::Assets;
@@ -1185,6 +1212,7 @@ fn draw_play(app: &mut App) {
         Modal::Over => again = draw_over(g),
         Modal::Rules => draw_rules(ui),
         Modal::Vote => draw_vote(g, ui),
+        Modal::Pause => draw_pause(g, ui),
         Modal::Quit => {
             if draw_quit(ui) {
                 *game = None;
@@ -1779,55 +1807,28 @@ fn draw_left_column(g: &mut Game, ui: &mut Ui, lay: &Layout) {
         draw_player_card(g, i, r);
     }
 
-    let bank_y = top + n as f32 * (card_h + gap) + 6.0;
-    let bank_h = (p.y + p.h - bank_y - 42.0).min(76.0);
-    if bank_h > 34.0 {
-        let r = Rect::new(p.x, bank_y, p.w, bank_h);
-        round_card(r.x, r.y, r.w, r.h, 12.0, CARD, CARD_EDGE);
-        txt(
-            i18n::t("Bank", "Banque"),
-            r.x + 16.0,
-            r.y + 24.0,
-            12.0,
-            CREAM_DIM,
-        );
-        serif_left(
-            i18n::t("Unlimited", "Illimitée"),
-            r.x + 16.0,
-            r.y + bank_h - 16.0,
-            21.0,
-            GOLD_SOFT,
-        );
-    }
-
     let bar = p.y + p.h - 30.0;
-    if button(
-        Rect::new(p.x, bar, 84.0, 28.0),
-        i18n::t("RULES", "RÈGLES"),
-        true,
-        false,
-    ) {
-        ui.rules_open = true;
-        ui.rules_page = 0;
+    if sound_button(Rect::new(p.x, bar, 34.0, 28.0), Icon::Pause, true) {
+        ui.pause_open = true;
     }
-    if button(Rect::new(p.x + 88.0, bar, 38.0, 28.0), i18n::code(), true, false) {
+    if button(Rect::new(p.x + 42.0, bar, 38.0, 28.0), i18n::code(), true, false) {
         i18n::toggle();
     }
     if sound_button(
-        Rect::new(p.x + 130.0, bar, 28.0, 28.0),
+        Rect::new(p.x + 88.0, bar, 28.0, 28.0),
         Icon::Sfx,
         crate::audio::sfx_on(),
     ) {
         crate::audio::toggle_sfx();
     }
     if sound_button(
-        Rect::new(p.x + 162.0, bar, 28.0, 28.0),
+        Rect::new(p.x + 120.0, bar, 28.0, 28.0),
         Icon::Music,
         crate::audio::music_on(),
     ) {
         crate::audio::toggle_music();
     }
-    if toggle_button(Rect::new(p.x + 194.0, bar, 54.0, 28.0), ">>>", g.fast) {
+    if toggle_button(Rect::new(p.x + 154.0, bar, 54.0, 28.0), ">>>", g.fast) {
         g.fast = !g.fast;
     }
 }
@@ -2068,44 +2069,6 @@ fn draw_right_column(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
         false,
     ) {
         g.open_trade();
-    }
-    y += bh + gap;
-
-    let can_save = input
-        && human
-        && matches!(g.phase, Phase::Roll | Phase::Manage)
-        && g.anim.is_none()
-        && g.trade.is_none()
-        && g.debt.is_none();
-    if button(
-        Rect::new(p.x, y, half, bh),
-        i18n::t("SAVE", "SAUVEGARDER"),
-        can_save,
-        false,
-    ) {
-        match crate::persist::save(g) {
-            Ok(path) => g.log(crate::tr!(
-                "Game saved to {}",
-                "Partie sauvegardée dans {}",
-                path.display()
-            )),
-            Err(err) => g.log(crate::tr!(
-                "Could not save: {}",
-                "Impossible de sauvegarder : {}",
-                err
-            )),
-        }
-    }
-    // Any human at the table can call the vote, even while a bot is playing.
-    let any_human = g.players.iter().any(|player| !player.ai);
-    if button(
-        Rect::new(p.x + half + gap, y, half, bh),
-        i18n::t("END GAME", "ARRÊTER"),
-        input && any_human,
-        false,
-    ) {
-        ui.vote_open = true;
-        ui.vote_agree = g.players.iter().map(|player| player.ai).collect();
     }
     y += bh + gap;
 
@@ -2997,360 +2960,229 @@ fn draw_over(g: &mut Game) -> bool {
 
 // ---------------------------------------------------------------- rule book
 
-enum Blk {
-    /// A chapter heading.
-    H(&'static str, &'static str),
-    /// A paragraph.
-    P(&'static str, &'static str),
-    /// A bullet.
-    B(&'static str, &'static str),
-    /// A boxed example.
-    X(&'static str, &'static str),
-}
-
-struct BookPage {
-    title: (&'static str, &'static str),
-    blocks: &'static [Blk],
-}
-
-static BOOK: [BookPage; 6] = [
-    BookPage {
-        title: ("The table", "La table"),
-        blocks: &[
-            Blk::H("The goal", "Le but"),
-            Blk::P(
-                "Crazyopoly is a property trading game for two to eight players, all on one screen. Buy lots, build on them, trade with the table and collect rent: the last solvent player wins, and the richest wins if the table stops early.",
-                "Crazyopoly est un jeu de négociation immobilière de deux à huit joueurs, sur un seul écran. Achetez, construisez, échangez et encaissez les loyers : le dernier solvable gagne, et le plus riche gagne si la table s'arrête avant la fin.",
-            ),
-            Blk::H("Sitting down", "S'installer"),
-            Blk::B(
-                "NEW GAME opens the setup: two to eight seats, each one HUMAN or BOT. A table of bots plays itself.",
-                "NOUVELLE PARTIE ouvre la préparation : deux à huit sièges, chacun HUMAIN ou BOT. Une table de bots joue toute seule.",
-            ),
-            Blk::B(
-                "Click a name to type another one, click the token to pick another design.",
-                "Cliquez sur un nom pour le modifier, sur le jeton pour changer de design.",
-            ),
-            Blk::B(
-                "START GAME begins. CONTINUE, on the main menu, resumes the saved game.",
-                "LANCER LA PARTIE commence. REPRENDRE, sur le menu, relance la partie sauvegardée.",
-            ),
-            Blk::H("A turn", "Un tour"),
-            Blk::B(
-                "Roll the dice, your token walks, then the space decides what happens.",
-                "Lancez les dés, votre pion avance, puis la case décide de la suite.",
-            ),
-            Blk::B(
-                "Doubles let you roll again. Three doubles in a row send you straight to Jail.",
-                "Un double vous fait rejouer. Trois doubles d'affilée vous envoient en prison.",
-            ),
-            Blk::B(
-                "Before ending your turn you may build, mortgage, trade, or read this book.",
-                "Avant de terminer votre tour, vous pouvez construire, hypothéquer, échanger ou lire ce livre.",
-            ),
-            Blk::H("The bank", "La banque"),
-            Blk::P(
-                "The bank is unlimited in this edition: it always has more cash, another house and another hotel, however long the game runs.",
-                "La banque est illimitée dans cette édition : elle a toujours plus d'argent, une maison de plus et un hôtel de plus, quelle que soit la durée de la partie.",
-            ),
-            Blk::H("The board", "Le plateau"),
-            Blk::B(
-                "Forty spaces: twenty-two streets in eight colour groups, four railroads, two utilities, eight special spaces and the two decks.",
-                "Quarante cases : vingt-deux rues en huit groupes de couleur, quatre gares, deux compagnies, huit cases spéciales et les deux paquets de cartes.",
-            ),
-            Blk::B(
-                "Street names stay in English, as on the classic board; the rest of the interface follows the language you picked.",
-                "Les noms de rues restent en anglais, comme sur le plateau classique ; le reste de l'interface suit la langue choisie.",
-            ),
-            Blk::X(
-                "EXAMPLE  You land on Vermont Avenue, still free: BUY pays 100 and the deed is yours, rent table and all. PASS sends it to auction, where another player may take it for less.",
-                "EXEMPLE  Vous tombez sur Vermont Avenue, encore libre : ACHETER paie 100 et la carte est à vous, table des loyers comprise. PASSER l'envoie aux enchères, où un autre joueur peut l'emporter pour moins cher.",
-            ),
-        ],
-    },
-    BookPage {
-        title: ("Buying, rent, buildings", "Achat, loyers, constructions"),
-        blocks: &[
-            Blk::H("Buy or pass", "Acheter ou passer"),
-            Blk::B(
-                "Land on a free lot and the deal is offered: BUY pays the price, PASS sends the lot to auction.",
-                "Sur une case libre, l'offre s'affiche : ACHETER paie le prix, PASSER envoie le lot aux enchères.",
-            ),
-            Blk::B(
-                "In an auction every player bids in turn, up to the cash on hand; the highest bid wins the lot.",
-                "Aux enchères, chacun mise à son tour, dans la limite de son argent liquide ; la meilleure offre remporte le bien.",
-            ),
-            Blk::B(
-                "Landing on a lot nobody bought costs nothing; landing on a mortgaged lot costs nothing either.",
-                "Tomber sur un lot libre ne coûte rien, et un lot hypothèque ne rapporte rien a son propriétaire.",
-            ),
-            Blk::H("Rent", "Les loyers"),
-            Blk::B(
-                "Street: the base rent, doubled once the owner holds the whole colour group.",
-                "Rue : le loyer de base, doublé dès que le propriétaire détient tout le groupe de couleur.",
-            ),
-            Blk::B(
-                "Railroad: 25, 50, 100 or 200, depending on how many the owner holds.",
-                "Gare : 25, 50, 100 ou 200 selon le nombre de gares possédées.",
-            ),
-            Blk::B(
-                "Utility: four times the dice with one, ten times with both.",
-                "Compagnie : quatre fois les dés avec une, dix fois avec les deux.",
-            ),
-            Blk::H("Houses and hotels", "Maisons et hôtels"),
-            Blk::B(
-                "You need the whole colour group, and you build evenly: no lot may have two more houses than another in its group.",
-                "Il faut tout le groupe de couleur, et la construction doit rester équilibrée : aucun lot ne peut avoir deux maisons de plus qu'un autre du groupe.",
-            ),
-            Blk::B(
-                "A hotel is a fifth building: it replaces the four houses and costs one more house price.",
-                "Un hôtel est une cinquième construction : il remplace les quatre maisons et coûte un prix de maison de plus.",
-            ),
-            Blk::B(
-                "Selling a building returns half its price; buildings must go evenly too.",
-                "Revendre une construction en rapporte la moitié ; la revente doit rester équilibrée elle aussi.",
-            ),
-            Blk::B(
-                "The bank never refuses a house or a hotel: there is no supply limit.",
-                "La banque ne refuse jamais une maison ni un hôtel : il n'y a aucune limite de stock.",
-            ),
-            Blk::B(
-                "For a repair card, a hotel counts as five buildings.",
-                "Pour une carte de réparation, un hôtel compte pour cinq constructions.",
-            ),
-            Blk::X(
-                "EXAMPLE  You hold the three light-blue lots: a base rent of 6 becomes 12 for the whole group, and the first house on it turns 12 into 30. Selling that house back pays half its price.",
-                "EXEMPLE  Vous détenez les trois terrains bleu clair : un loyer de base de 6 passe à 12 pour tout le groupe, et la première maison le porte à 30. Revendre cette maison en rend la moitié du prix.",
-            ),
-            Blk::H("Watch the group", "Surveillez le groupe"),
-            Blk::B(
-                "Two lots of a group are worth far more than their prices: the third one doubles every rent of the set.",
-                "Deux terrains d'un groupe valent bien plus que leur prix : le troisième double tous les loyers de la série.",
-            ),
-            Blk::B(
-                "A bot pays well over the price for the lot that completes its group, and refuses to complete yours.",
-                "Un bot paie largement plus que le prix le terrain qui complète son groupe, et refuse de compléter le vôtre.",
-            ),
-        ],
-    },
-    BookPage {
-        title: ("Money and debt", "Argent et dettes"),
-        blocks: &[
-            Blk::H("Income", "Les revenus"),
-            Blk::B(
-                "Passing or landing on GO pays 200.",
-                "Passer ou s'arrêter sur DEPART rapporte 200.",
-            ),
-            Blk::B(
-                "Income Tax takes 200, Luxury Tax takes 100.",
-                "L'impôt sur le revenu prend 200, la taxe de luxe 100.",
-            ),
-            Blk::B(
-                "Chance and Community Chest move money both ways, along with lots and tokens.",
-                "Chance et Caisse de communauté font circuler l'argent dans les deux sens, ainsi que les lots et les pions.",
-            ),
-            Blk::H("Mortgages", "Les hypothèques"),
-            Blk::B(
-                "Mortgaging a lot pays half its price at once; a mortgaged lot collects no rent.",
-                "Hypothequer un lot rapporte la moitie de son prix ; un lot hypothèque ne rapporte aucun loyer.",
-            ),
-            Blk::B(
-                "Lifting it later costs the mortgage plus ten per cent interest.",
-                "Le lever plus tard coûte l'hypothèque plus dix pour cent d'intérêts.",
-            ),
-            Blk::B(
-                "Sell every building of a colour group before mortgaging one of its lots.",
-                "Vendez toutes les constructions d'un groupe avant d'hypothéquer un de ses lots.",
-            ),
-            Blk::H("Debt", "Les dettes"),
-            Blk::P(
-                "When you owe more than your cash, the debt window opens: sell buildings and mortgage lots until you can cover the amount.",
-                "Quand vous devez plus que votre argent liquide, la fenêtre de dette s'ouvre : vendez des constructions et hypothéquez jusqu'à couvrir la somme.",
-            ),
-            Blk::B(
-                "Pay as soon as your cash covers the debt, or declare bankruptcy.",
-                "Payez dès que votre argent couvre la dette, sinon déclarez la faillite.",
-            ),
-            Blk::B(
-                "The assets go to the creditor, or back to the bank; the last solvent player wins.",
-                "Les biens vont au créancier, ou à la banque ; le dernier solvable gagne.",
-            ),
-            Blk::X(
-                "EXAMPLE  A lot worth 200 mortgages for 100. Lifting it later costs 110, the mortgage plus ten per cent interest, and until then landing on it pays you nothing.",
-                "EXEMPLE  Un terrain de 200 s'hypothèque pour 100. Le lever plus tard coûte 110, l'hypothèque plus dix pour cent d'intérêts, et d'ici là il ne rapporte aucun loyer.",
-            ),
-        ],
-    },
-    BookPage {
-        title: ("Jail and cards", "Prison et cartes"),
-        blocks: &[
-            Blk::H("Jail", "La prison"),
-            Blk::B(
-                "Three ways out, on any of your turns: roll doubles, pay the 50 fine, or play a Get Out of Jail Free card.",
-                "Trois sorties possibles, à chacun de vos tours : faire un double, payer l'amende de 50, ou jouer une carte de sortie.",
-            ),
-            Blk::B(
-                "A failed third turn costs the fine and frees you at once.",
-                "Un troisième essai manqué vous coûte l'amende et vous libère aussitôt.",
-            ),
-            Blk::B(
-                "Just Visiting is only a space: you collect nothing there.",
-                "Simple visite n'est qu'une case : on n'y fait rien.",
-            ),
-            Blk::H("Doubles", "Les doubles"),
-            Blk::B(
-                "After a double you move, resolve the space, then roll again.",
-                "Après un double, vous avancez, résolvez la case, puis relancez.",
-            ),
-            Blk::B(
-                "Three doubles in a row: straight to Jail, without passing GO.",
-                "Trois doubles d'affilée : direction la prison, sans passer par la case départ.",
-            ),
-            Blk::H("Chance and Community Chest", "Chance et Caisse de communauté"),
-            Blk::B(
-                "Sixteen cards each, drawn and discarded in a fixed order, then the deck starts again.",
-                "Seize cartes chacun, tirées et défaussées dans un ordre fixe, puis le paquet recommence.",
-            ),
-            Blk::B(
-                "They advance you to a space, the nearest railroad or utility, charge repairs, pay or take money with every player.",
-                "Elles vous avancent sur une case, la gare ou la compagnie la plus proche, facturent des réparations, donnent ou prennent de l'argent à chaque joueur.",
-            ),
-            Blk::B(
-                "Landing on a free lot from a card still lets you buy it, and rent is owed on a rented one.",
-                "Tomber sur un lot libre par une carte permet encore de l'acheter, et le loyer est dû sur un terrain loué.",
-            ),
-            Blk::X(
-                "EXAMPLE  In Jail on your first turn you try doubles and fail. Second turn, same. On the third you may pay the 50 fine and roll normally again, or try doubles one last time.",
-                "EXEMPLE  En prison à votre premier tour, vous tentez un double et échouez. Deuxième tour, même chose. Au troisième, vous pouvez payer l'amende de 50 et relancer normalement, ou tenter un dernier double.",
-            ),
-        ],
-    },
-    BookPage {
-        title: ("Trades and bots", "Échanges et bots"),
-        blocks: &[
-            Blk::H("Trading", "Les échanges"),
-            Blk::B(
-                "TRADE opens the table: pick a partner, tick lots and cash on each side, then propose.",
-                "ÉCHANGE ouvre la table : choisissez un partenaire, cochez les lots et l'argent de chaque côté, puis proposez.",
-            ),
-            Blk::B(
-                "Nothing moves until the partner accepts; declining leaves the offer in draft.",
-                "Rien ne bouge avant l'accord du partenaire ; un refus laisse l'offre en brouillon.",
-            ),
-            Blk::B(
-                "The arrow beside the partner cycles through the other players.",
-                "La fleche à côté du partenaire fait le tour des autres joueurs.",
-            ),
-            Blk::H("Bots at the table", "Les bots à la table"),
-            Blk::B(
-                "A bot values each lot, the colour group it would complete, and the groups it would break.",
-                "Un bot évalue chaque lot, le groupe de couleur qu'il compléterait et ceux qu'il casserait.",
-            ),
-            Blk::B(
-                "It refuses to hand you a monopoly, and refuses to break one of its own.",
-                "Il refuse de vous offrir un monopole, et refuse de casser le sien.",
-            ),
-            Blk::H("Offers the bots make", "Les offres des bots"),
-            Blk::B(
-                "Holding all but one lot of a colour group, a bot offers cash for the missing one.",
-                "Quand il lui manque un seul lot d'un groupe, un bot propose de l'argent pour celui qui manque.",
-            ),
-            Blk::B(
-                "Offered to you, the trade window opens and you answer it.",
-                "Quand l'offre vous vise, la fenêtre d'échange s'ouvre et vous repondez.",
-            ),
-            Blk::B(
-                "Offered to another bot, it is settled at once and the deal is written in the log.",
-                "Quand elle vise un autre bot, elle est réglée aussitôt et l'accord s'inscrit dans le journal.",
-            ),
-            Blk::H("What bots do", "Ce que font les bots"),
-            Blk::B(
-                "They roll, buy, bid at auction, build, sell to cover a debt and end their turn.",
-                "Ils lancent les dés, achètent, enchérissent, construisent, vendent pour couvrir une dette et terminent leur tour.",
-            ),
-            Blk::B(
-                "The >>> button skips every animation and every bot delay.",
-                "Le bouton >>> passe toutes les animations et toutes les attentes des bots.",
-            ),
-            Blk::X(
-                "EXAMPLE  A bot holds two of the three green lots and offers 340 for the third. Accept and the cash is yours, but the group, and its doubled rents, become its monopoly. Another bot may accept the same offer at once, and the log shows the deal.",
-                "EXEMPLE  Un bot détient deux des trois terrains verts et propose 340 pour le troisième. Si vous acceptez, l'argent est à vous, mais le groupe, et ses loyers doublés, deviennent son monopole. Un autre bot peut accepter la même offre aussitôt, et le journal affiche l'accord.",
-            ),
-        ],
-    },
-    BookPage {
-        title: ("Ending and the screen", "Fin de partie et écran"),
-        blocks: &[
-            Blk::H("Ending a game", "Terminer une partie"),
-            Blk::B(
-                "The game ends when one solvent player is left: they take the table.",
-                "La partie se termine quand il ne reste qu'un joueur solvable : il remporte la table.",
-            ),
-            Blk::B(
-                "Or stop early: ARRETER calls the vote. Every human must agree, bots always do.",
-                "Ou arrêtez plus tôt : ARRÊTER lance le vote. Chaque humain doit être d'accord, les bots le sont toujours.",
-            ),
-            Blk::B(
-                "The winner is the highest net worth: cash, plus the price of every deed, plus its buildings.",
-                "Le vainqueur a le plus haut patrimoine : l'argent, plus le prix de chaque bien, plus ses constructions.",
-            ),
-            Blk::H("Saving", "Sauvegarder"),
-            Blk::B(
-                "SAUVEGARDER writes the whole game to one slot, as plain readable JSON.",
-                "SAUVEGARDER écrit toute la partie dans un seul emplacement, en JSON lisible.",
-            ),
-            Blk::B(
-                "CONTINUE on the main menu brings it back, players, deeds and decks included.",
-                "REPRENDRE sur le menu la recharge, joueurs, biens et paquets compris.",
-            ),
-            Blk::H("The screen", "L'écran"),
-            Blk::B(
-                "Hover any tile to read its title deed, owner included; ASSETS lists your lots.",
-                "Survolez une case pour lire sa carte, propriétaire compris ; MES BIENS liste vos lots.",
-            ),
-            Blk::B(
-                "RULES, at the bottom left, opens this book at any time.",
-                "RÈGLES, en bas à gauche, ouvre ce livre à tout moment.",
-            ),
-            Blk::B(
-                "MENU, at the top of the log, asks once and returns to the main menu.",
-                "MENU, en haut du journal, demande confirmation et ramène au menu principal.",
-            ),
-            Blk::B(
-                "FR and EN switch the language, the two icons mute sound and music, >>> speeds the game up.",
-                "FR et EN changent la langue, les deux icônes coupent le son et la musique, >>> accélère la partie.",
-            ),
-            Blk::H("House rules", "Règles maison"),
-            Blk::B(
-                "Free Parking collects nothing; there is no pot in the middle.",
-                "Parc gratuit ne rapporte rien ; il n'y a pas de cagnotte au centre.",
-            ),
-            Blk::B(
-                "Auction bids are limited to the cash on hand.",
-                "Les enchères sont limitées à l'argent liquide disponible.",
-            ),
-            Blk::B(
-                "A player bankrupt to the bank returns their lots to the bank, they are not re-auctioned.",
-                "Un joueur en faillite rend ses lots à la banque, ils ne sont pas remis aux enchères.",
-            ),
-            Blk::B(
-                "The log keeps every roll, purchase, rent and deal, in the player's colour.",
-                "Le journal garde chaque lancer, achat, loyer et accord, dans la couleur du joueur.",
-            ),
-            Blk::X(
-                "EXAMPLE  You hold 900 in cash, three deeds worth 640 and five houses worth 500: your net worth is 2040, and that is the number the vote compares.",
-                "EXEMPLE  Vous avez 900 en liquide, trois terrains d'une valeur de 640 et cinq maisons de 500 : votre patrimoine est de 2040, et c'est ce nombre que le vote compare.",
-            ),
-        ],
-    },
-];
-
+// The rulebook is printed on cream paper, in wine and gold like the table.
 const PAPER: Color = Color { r: 0.949, g: 0.918, b: 0.839, a: 1.0 };
 const PAPER_EDGE: Color = Color { r: 0.780, g: 0.714, b: 0.553, a: 1.0 };
 const BOOK_INK: Color = Color { r: 0.169, g: 0.157, b: 0.129, a: 1.0 };
 const BOOK_SOFT: Color = Color { r: 0.376, g: 0.345, b: 0.278, a: 1.0 };
 const BOOK_WINE: Color = Color { r: 0.478, g: 0.180, b: 0.212, a: 1.0 };
 const BOOK_GOLD: Color = Color { r: 0.690, g: 0.549, b: 0.310, a: 1.0 };
+
+/// A paragraph or a bullet: the only two kinds of text a rule page holds.
+enum Blk {
+    P(&'static str, &'static str),
+    B(&'static str, &'static str),
+}
+
+/// One rule and the clauses that belong to it. A section is always placed
+/// whole, so a rule is never cut by a column break or the foot of a page.
+struct Section {
+    head: (&'static str, &'static str),
+    blocks: &'static [Blk],
+}
+
+struct BookPage {
+    title: (&'static str, &'static str),
+    sections: &'static [Section],
+}
+
+static BOOK: [BookPage; 4] = [
+    BookPage {
+        title: ("The table", "La table"),
+        sections: &[
+            Section {
+                head: ("The goal", "Le but"),
+                blocks: &[Blk::P(
+                    "Crazyopoly is a property trading game for two to eight players sharing one screen. Players buy streets, build on them, trade them and collect rent. The game ends when a single solvent player remains; if the table decides otherwise, the ranking is settled on net worth.",
+                    "Crazyopoly est un jeu de négociation immobilière pour deux à huit joueurs réunis sur un seul écran. Les joueurs achètent des rues, les construisent, les échangent et encaissent les loyers. La partie s'arrête quand un seul joueur reste solvable ; si la table en décide autrement, le classement se fait sur la fortune nette.",
+                )],
+            },
+            Section {
+                head: ("The setup", "La mise en place"),
+                blocks: &[
+                    Blk::B(
+                        "Two to eight seats. Each seat is held by a human or by a bot, and takes a name and a token.",
+                        "De deux à huit sièges. Chaque siège est tenu par un humain ou par un bot, et reçoit un nom et un jeton.",
+                    ),
+                    Blk::B(
+                        "Every player starts on GO with the same amount of cash.",
+                        "Tous les joueurs partent de la case DÉPART avec la même somme d'argent.",
+                    ),
+                    Blk::B(
+                        "The game begins once the seats are ready; a saved game is resumed from the main menu.",
+                        "La partie commence dès que les sièges sont prêts ; une partie sauvegardée se reprend depuis le menu principal.",
+                    ),
+                    Blk::B(
+                        "A table made only of bots plays by itself.",
+                        "Une table entièrement composée de bots joue toute seule.",
+                    ),
+                ],
+            },
+            Section {
+                head: ("Order of play", "L'ordre de jeu"),
+                blocks: &[Blk::P(
+                    "Players take their turns in seat order, clockwise. The player whose turn it is rolls both dice, moves the token by the total, then resolves the space reached.",
+                    "Les joueurs jouent dans l'ordre des sièges, dans le sens des aiguilles d'une montre. Le joueur dont c'est le tour lance les deux dés, avance son jeton du total obtenu, puis résout la case atteinte.",
+                )],
+            },
+            Section {
+                head: ("Doubles", "Les doubles"),
+                blocks: &[Blk::P(
+                    "A double grants a second roll to the same player. Three doubles in a row send that player to Jail without moving.",
+                    "Un double offre un second lancer au même joueur. Trois doubles consécutifs envoient ce joueur en prison sans qu'il avance.",
+                )],
+            },
+            Section {
+                head: ("Ending a turn", "La fin du tour"),
+                blocks: &[Blk::P(
+                    "Once the space is resolved, the player may build, mortgage or trade, then ends the turn and play passes to the next seat. Nothing is decided in the player's place.",
+                    "Une fois la case résolue, le joueur peut construire, hypothéquer ou négocier, puis termine son tour et la main passe au siège suivant. Aucune décision n'est prise à la place du joueur.",
+                )],
+            },
+        ],
+    },
+    BookPage {
+        title: ("The board", "Le plateau"),
+        sections: &[
+            Section {
+                head: ("The spaces", "Les cases"),
+                blocks: &[Blk::P(
+                    "Forty spaces: twenty-two streets in eight colour groups, four railroads, two utilities, four corner spaces, two tax spaces, the Jail, Free Parking, GO and the two card decks.",
+                    "Quarante cases : vingt-deux rues réparties en huit groupes de couleur, quatre gares, deux compagnies, quatre cases d'angle, deux cases d'impôt, la prison, le parc gratuit, la case DÉPART et les deux paquets de cartes.",
+                )],
+            },
+            Section {
+                head: ("Colour groups", "Les groupes de couleur"),
+                blocks: &[Blk::P(
+                    "Each group gathers two or three streets of the same colour, and holding all of them doubles the rent. Street names stay in English, as on the original board; the rest of the interface follows the language chosen.",
+                    "Chaque groupe réunit deux ou trois rues de même couleur, et le fait de les détenir toutes double le loyer. Les noms de rues restent en anglais, comme sur le plateau d'origine ; le reste de l'interface suit la langue choisie.",
+                )],
+            },
+            Section {
+                head: ("GO", "Le départ"),
+                blocks: &[Blk::P(
+                    "The salary is paid on every pass over GO and on every landing there.",
+                    "Le salaire est versé à chaque passage sur la case DÉPART et à chaque arrêt sur cette case.",
+                )],
+            },
+            Section {
+                head: ("Buying", "L'achat"),
+                blocks: &[Blk::P(
+                    "On a street, a railroad or a utility that is still free, the player may buy the lot at the price printed on the space.",
+                    "Sur une rue, une gare ou une compagnie encore libre, le joueur peut acheter le lot au prix affiché sur la case.",
+                )],
+            },
+            Section {
+                head: ("Auctions", "Les enchères"),
+                blocks: &[Blk::P(
+                    "A player who declines to buy sends the lot to auction. Every player bids in turn, up to the cash on hand; the highest bid wins the lot, which returns to the bank if nobody bids.",
+                    "Le joueur qui renonce à l'achat envoie le lot aux enchères. Chacun mise à son tour, dans la limite de son argent liquide ; la plus haute offre l'emporte, et le lot retourne à la banque si personne ne mise.",
+                )],
+            },
+            Section {
+                head: ("Rent", "Les loyers"),
+                blocks: &[
+                    Blk::B(
+                        "Street: the base rent, doubled once the owner holds the whole colour group.",
+                        "Rue : le loyer de base, doublé dès que le propriétaire détient tout le groupe de couleur.",
+                    ),
+                    Blk::B(
+                        "Railroad: twenty-five, fifty, one hundred or two hundred, depending on how many are held.",
+                        "Gare : vingt-cinq, cinquante, cent ou deux cents, selon le nombre de gares détenues.",
+                    ),
+                    Blk::B(
+                        "Utility: four times the dice with one utility, ten times with both.",
+                        "Compagnie : quatre fois les dés avec une seule compagnie, dix fois avec les deux.",
+                    ),
+                    Blk::B(
+                        "A mortgaged lot pays no rent.",
+                        "Un lot hypothéqué ne rapporte aucun loyer.",
+                    ),
+                ],
+            },
+        ],
+    },
+    BookPage {
+        title: ("Building", "Construire"),
+        sections: &[
+            Section {
+                head: ("Houses and hotels", "Maisons et hôtels"),
+                blocks: &[Blk::P(
+                    "Building requires the whole colour group and is done evenly: no street of the group may hold two houses more than another. The hotel is the fifth building; it replaces the four houses and costs one further house price.",
+                    "La construction exige la totalité du groupe de couleur et se fait à effectif égal : aucune rue du groupe ne peut compter deux maisons de plus qu'une autre. L'hôtel est la cinquième construction ; il remplace les quatre maisons et coûte un prix de maison supplémentaire.",
+                )],
+            },
+            Section {
+                head: ("Selling and mortgaging", "Vendre et hypothéquer"),
+                blocks: &[Blk::P(
+                    "Buildings are sold back for half their price, still evenly. Mortgaging a lot yields its mortgage value; redeeming it costs that value plus ten per cent interest. A mortgaged lot cannot be built on.",
+                    "Les constructions se revendent à la moitié de leur prix, toujours à effectif égal. Hypothéquer un lot en rapporte la valeur hypothécaire ; le dégager coûte cette valeur majorée de dix pour cent d'intérêt. Un lot hypothéqué ne peut pas être construit.",
+                )],
+            },
+            Section {
+                head: ("The bank", "La banque"),
+                blocks: &[Blk::P(
+                    "The bank never runs short of cash or of buildings: houses, hotels and notes are supplied for as long as the game asks for them.",
+                    "La banque ne manque ni d'argent ni de bâtiments : maisons, hôtels et billets sont fournis tant que la partie en demande.",
+                )],
+            },
+            Section {
+                head: ("Trades", "Les échanges"),
+                blocks: &[Blk::P(
+                    "Two players may exchange lots and cash during their turn. A bot weighs the offer and answers it; two bots may settle between themselves without help.",
+                    "Deux joueurs peuvent échanger des lots et de l'argent pendant leur tour. Un bot évalue l'offre et y répond ; deux bots peuvent conclure entre eux sans intervention.",
+                )],
+            },
+            Section {
+                head: ("Jail", "La prison"),
+                blocks: &[Blk::P(
+                    "A player enters Jail through a space, through a card, or through three doubles. Three ways out: roll a double, pay the fine, or present a Get Out of Jail Free card. After three turns without a double, the fine is due.",
+                    "Le joueur entre en prison par une case, par une carte ou par trois doubles. Trois issues s'offrent à lui : tenter un double, payer l'amende, ou présenter une carte Sortie de prison. Après trois tours sans double, l'amende est due.",
+                )],
+            },
+        ],
+    },
+    BookPage {
+        title: ("Cards and the end", "Cartes et fin de partie"),
+        sections: &[
+            Section {
+                head: ("Chance and Community Chest", "Chance et Caisse de communauté"),
+                blocks: &[Blk::P(
+                    "The two decks mix moves, payments, repairs and Get Out of Jail Free cards. A card drawn applies at once, then returns under its deck.",
+                    "Les deux paquets mêlent déplacements, perceptions, réparations et cartes de sortie de prison. Une carte tirée s'applique immédiatement, puis retourne sous son paquet.",
+                )],
+            },
+            Section {
+                head: ("Repairs", "Les réparations"),
+                blocks: &[Blk::P(
+                    "Repair cards are paid per house and per hotel, over every property the player holds.",
+                    "Les cartes de réparation se paient par maison et par hôtel, sur l'ensemble des biens du joueur.",
+                )],
+            },
+            Section {
+                head: ("Debts and bankruptcy", "Dettes et faillite"),
+                blocks: &[Blk::P(
+                    "A player who cannot meet a debt sells buildings, mortgages lots, or declares bankruptcy. The estate then passes to the creditor, or to the bank.",
+                    "Le joueur qui ne peut pas honorer une dette vend ses constructions, hypothèque ses lots, ou se déclare en faillite. Ses biens passent alors à son créancier, ou à la banque.",
+                )],
+            },
+            Section {
+                head: ("The end of the game", "La fin de partie"),
+                blocks: &[Blk::P(
+                    "The game ends when one solvent player remains. The table may also vote to stop it at any moment; the ranking is then settled on net worth, cash and property together, buildings counted and mortgages deducted.",
+                    "La partie s'achève quand un seul joueur reste solvable. La table peut aussi voter son arrêt à tout moment ; le classement se fait alors sur la fortune nette, argent et biens compris, constructions comptées et hypothèques déduites.",
+                )],
+            },
+            Section {
+                head: ("The pause menu", "Le menu pause"),
+                blocks: &[Blk::P(
+                    "Escape freezes the table and opens the pause menu, from which one resumes, saves, rereads these rules or proposes to stop the game. A save is a single file.",
+                    "La touche Échap fige la table et ouvre le menu pause, d'où l'on reprend, sauvegarde, relit ces règles ou propose d'arrêter la partie. Une sauvegarde tient dans un seul fichier.",
+                )],
+            },
+        ],
+    },
+];
 
 fn draw_menu(app: &mut App) {
     felt_background();
@@ -3377,21 +3209,6 @@ fn draw_menu(app: &mut App) {
         1.0,
         Color { r: 0.843, g: 0.706, b: 0.396, a: 0.07 },
     );
-
-    // The board's rings, breathing slowly behind the title.
-    for k in 0..4 {
-        let base = (sh * (0.30 + k as f32 * 0.055)).min(sw * 0.44);
-        let size = base * (1.0 + (t * 0.35 + k as f32 * 0.8).sin() * 0.014);
-        let glow = 0.030 + 0.014 * (t * 0.7 + k as f32 * 1.3).sin().max(0.0);
-        draw_rectangle_lines(
-            cx - size * 0.5,
-            sh * 0.055 - (size - base) * 0.5,
-            size,
-            size,
-            1.0,
-            Color { r: 1.0, g: 1.0, b: 1.0, a: glow },
-        );
-    }
 
     // Gold motes drifting up the table, like dust in a lamp's light.
     for i in 0..36 {
@@ -3614,130 +3431,120 @@ fn draw_rules(ui: &mut Ui) {
     serif_center(i18n::t(page.title.0, page.title.1), cx, r.y + 76.0, 31.0, BOOK_WINE);
     draw_line(cx - 92.0, r.y + 90.0, cx + 92.0, r.y + 90.0, 1.2, BOOK_GOLD);
 
-    // Lay every block out once, so the two columns can be balanced.
     let gutter = 46.0;
     let col_w = (r.w - pad * 2.0 - gutter) * 0.5;
-    let line_h = 23.5;
+    let line_h = 25.0;
+    let top = r.y + 122.0;
+    let bottom = r.y + h - 106.0;
+
+    // Measure every section whole, then place it: a rule never straddles the
+    // two columns nor the foot of the page.
     struct Item {
         kind: u8,
-        text: String,
         lines: Vec<String>,
-        size: f32,
-        indent: f32,
         h: f32,
     }
-    let mut items: Vec<Item> = Vec::new();
-    for blk in page.blocks.iter() {
-        let (kind, en, fr) = match blk {
-            Blk::H(a, b) => (0u8, *a, *b),
-            Blk::P(a, b) => (1u8, *a, *b),
-            Blk::B(a, b) => (2u8, *a, *b),
-            Blk::X(a, b) => (3u8, *a, *b),
-        };
-        let text = i18n::t(en, fr).to_string();
-        let (size, indent) = match kind {
-            0 => (13.5, 0.0),
-            1 => (16.0, 0.0),
-            2 => (16.0, 17.0),
-            _ => (15.0, 18.0),
-        };
-        let wrap_w = if kind == 3 { col_w - 36.0 } else { col_w - indent };
-        let lines = wrap(&text, wrap_w, size);
-        let h = match kind {
-            0 => 34.0,
-            3 => lines.len() as f32 * line_h + 26.0,
-            _ => lines.len() as f32 * line_h + 12.0,
-        };
+    let mut sections: Vec<(Vec<Item>, f32)> = Vec::new();
+    for section in page.sections.iter() {
+        let mut items: Vec<Item> = Vec::new();
         items.push(Item {
-            kind,
-            text,
-            lines,
-            size,
-            indent,
-            h,
+            kind: 0,
+            lines: vec![i18n::t(section.head.0, section.head.1).to_uppercase()],
+            h: 32.0,
         });
-    }
-
-    let total: f32 = items.iter().map(|i| i.h).sum();
-    let target = total * 0.5;
-    let mut acc = 0.0;
-    let mut split = items.len();
-    for (idx, item) in items.iter().enumerate() {
-        if acc + item.h * 0.5 > target {
-            split = idx;
-            break;
+        for blk in section.blocks.iter() {
+            let (kind, text) = match blk {
+                Blk::P(en, fr) => (1u8, i18n::t(en, fr).to_string()),
+                Blk::B(en, fr) => (2u8, i18n::t(en, fr).to_string()),
+            };
+            let width = if kind == 2 { col_w - 17.0 } else { col_w };
+            let lines = wrap(&text, width, 16.5);
+            let h = lines.len() as f32 * line_h + if kind == 2 { 10.0 } else { 14.0 };
+            items.push(Item { kind, lines, h });
         }
-        acc += item.h;
-    }
-    // Never leave a heading alone at the foot of a column.
-    if split > 0 && split < items.len() && items[split - 1].kind == 0 {
-        split -= 1;
+        let height: f32 = items.iter().map(|i| i.h).sum::<f32>() + 16.0;
+        sections.push((items, height));
     }
 
-    let top = r.y + 122.0;
-    let draw_column = |items: &[Item], x: f32| {
-        let mut y = top;
-        for item in items {
+    // Split where the two columns end closest together, so a page looks set
+    // rather than poured to one side; a section still never straddles the two.
+    let col_h = bottom - top;
+    let heights: Vec<f32> = sections.iter().map(|(_, h)| *h).collect();
+    let total: f32 = heights.iter().sum();
+    let mut split = sections.len();
+    if total > col_h {
+        let mut best = f32::MAX;
+        let mut left = 0.0;
+        for k in 1..sections.len() {
+            left += heights[k - 1];
+            let right = total - left;
+            if left <= col_h && right <= col_h {
+                let skew = (left - right).abs();
+                if skew < best {
+                    best = skew;
+                    split = k;
+                }
+            }
+        }
+        if best == f32::MAX {
+            // One section is taller than a column: fall back to plain flow.
+            split = sections.len();
+            let mut acc = 0.0;
+            for (k, h) in heights.iter().enumerate() {
+                if acc + h > col_h {
+                    split = k;
+                    break;
+                }
+                acc += h;
+            }
+        }
+    }
+    let mut placed: Vec<(usize, f32, Vec<Item>)> = Vec::new();
+    let mut y = top;
+    for (k, (items, _)) in sections.into_iter().enumerate() {
+        let column = if k < split { 0 } else { 1 };
+        if column == 1 && k == split {
+            y = top;
+        }
+        placed.push((column, y, items));
+        y += heights[k];
+    }
+    let two_columns = placed.iter().any(|(c, _, _)| *c == 1);
+
+    for (col, start, items) in placed.iter() {
+        let x = r.x + pad + *col as f32 * (col_w + gutter);
+        let mut y = *start;
+        for item in items.iter() {
             match item.kind {
                 0 => {
                     draw_rectangle(x, y + 5.0, 18.0, 1.6, BOOK_GOLD);
-                    spaced_left(&item.text.to_uppercase(), x + 26.0, y + 14.0, 11.5, 1.6, BOOK_WINE);
+                    spaced_left(&item.lines[0], x + 26.0, y + 14.0, 11.5, 1.6, BOOK_WINE);
                 }
-                1 => {
-                    for (i, line) in item.lines.iter().enumerate() {
-                        txt(line, x, y + 15.0 + i as f32 * line_h, item.size, BOOK_INK);
-                    }
-                }
-                3 => {
-                    round_card(
-                        x,
-                        y + 3.0,
-                        col_w,
-                        item.h - 10.0,
-                        8.0,
-                        Color { r: 0.929, g: 0.890, b: 0.796, a: 1.0 },
-                        Color { r: BOOK_GOLD.r, g: BOOK_GOLD.g, b: BOOK_GOLD.b, a: 0.45 },
-                    );
-                    draw_rectangle(x + 1.5, y + 12.0, 3.0, item.h - 28.0, BOOK_GOLD);
-                    for (i, line) in item.lines.iter().enumerate() {
-                        txt(
-                            line,
-                            x + 18.0,
-                            y + 19.0 + i as f32 * line_h,
-                            item.size,
-                            BOOK_SOFT,
-                        );
-                    }
-                }
-                _ => {
+                2 => {
                     for (i, line) in item.lines.iter().enumerate() {
                         if i == 0 {
                             draw_circle(x + 4.0, y + 7.0, 2.2, BOOK_GOLD);
                         }
-                        txt(
-                            line,
-                            x + item.indent,
-                            y + 15.0 + i as f32 * line_h,
-                            item.size,
-                            BOOK_INK,
-                        );
+                        txt(line, x + 17.0, y + 15.0 + i as f32 * line_h, 16.5, BOOK_INK);
+                    }
+                }
+                _ => {
+                    for (i, line) in item.lines.iter().enumerate() {
+                        txt(line, x, y + 15.0 + i as f32 * line_h, 16.5, BOOK_INK);
                     }
                 }
             }
             y += item.h;
         }
-    };
+    }
 
-    draw_column(&items[..split], r.x + pad);
-    if split < items.len() {
-        draw_column(&items[split..], r.x + pad + col_w + gutter);
+    if two_columns {
         let gx = r.x + pad + col_w + gutter * 0.5;
-        draw_rectangle(gx - 5.0, top - 16.0, 10.0, r.y + h - 96.0 - (top - 16.0), Color { r: 0.35, g: 0.30, b: 0.22, a: 0.05 });
         draw_line(
             gx,
             top - 16.0,
             gx,
-            r.y + h - 96.0,
+            bottom + 6.0,
             1.0,
             Color { r: BOOK_GOLD.r, g: BOOK_GOLD.g, b: BOOK_GOLD.b, a: 0.35 },
         );
@@ -3753,24 +3560,18 @@ fn draw_rules(ui: &mut Ui) {
         1.0,
         Color { r: BOOK_GOLD.r, g: BOOK_GOLD.g, b: BOOK_GOLD.b, a: 0.4 },
     );
-    if ui.rules_page > 0
-        && button(
-            Rect::new(r.x + pad, fy, 96.0, 36.0),
-            i18n::t("< PREV", "< PRÉC."),
-            true,
-            false,
-        )
-    {
+    if paper_button(
+        Rect::new(r.x + pad, fy, 96.0, 36.0),
+        i18n::t("< PREV", "< PRÉC."),
+        ui.rules_page > 0,
+    ) {
         ui.rules_page -= 1;
     }
-    if ui.rules_page + 1 < BOOK.len()
-        && button(
-            Rect::new(r.x + pad + 104.0, fy, 96.0, 36.0),
-            i18n::t("NEXT >", "SUIV. >"),
-            true,
-            false,
-        )
-    {
+    if paper_button(
+        Rect::new(r.x + pad + 104.0, fy, 96.0, 36.0),
+        i18n::t("NEXT >", "SUIV. >"),
+        ui.rules_page + 1 < BOOK.len(),
+    ) {
         ui.rules_page += 1;
     }
     let n = BOOK.len() as f32;
@@ -3782,27 +3583,141 @@ fn draw_rules(ui: &mut Ui) {
             fy + 11.0,
             if on { 4.6 } else { 3.0 },
             if on {
-                BOOK_GOLD
+                BOOK_WINE
             } else {
-                Color { r: BOOK_GOLD.r, g: BOOK_GOLD.g, b: BOOK_GOLD.b, a: 0.4 }
+                Color { r: BOOK_GOLD.r, g: BOOK_GOLD.g, b: BOOK_GOLD.b, a: 0.45 }
             },
         );
     }
     centered(
-        &format!("{} {} / {}", i18n::t("PAGE", "PAGE"), ui.rules_page + 1, BOOK.len()),
+        &format!(
+            "{} {} / {}",
+            i18n::t("PAGE", "PAGE"),
+            ui.rules_page + 1,
+            BOOK.len()
+        ),
         cx,
         fy + 34.0,
         10.0,
         BOOK_SOFT,
     );
-    if button(
+    if paper_button(
         Rect::new(r.x + w - pad - 130.0, fy, 130.0, 36.0),
         i18n::t("CLOSE", "FERMER"),
         true,
-        false,
     ) {
         ui.rules_open = false;
     }
+}
+
+/// A page-turn control printed on the cream paper: wine plate, paper type, and
+/// a pale plate when the turn is not available.
+fn paper_button(r: Rect, label: &str, enabled: bool) -> bool {
+    let (mx, my) = mouse_position();
+    let hover = enabled && inr(r, mx, my);
+    if !enabled {
+        round_outline(
+            r.x,
+            r.y,
+            r.w,
+            r.h,
+            8.0,
+            1.0,
+            Color { r: 0.62, g: 0.56, b: 0.44, a: 0.32 },
+        );
+        centered_bold(
+            label,
+            r.x + r.w * 0.5,
+            r.y + r.h * 0.5,
+            11.5,
+            Color { r: 0.55, g: 0.49, b: 0.38, a: 0.6 },
+        );
+        return false;
+    }
+    round_rect(
+        r.x,
+        r.y,
+        r.w,
+        r.h,
+        8.0,
+        if hover {
+            Color { r: 0.47, g: 0.185, b: 0.215, a: 1.0 }
+        } else {
+            BOOK_WINE
+        },
+    );
+    centered_bold(label, r.x + r.w * 0.5, r.y + r.h * 0.5, 11.5, PAPER);
+    hover && is_mouse_button_pressed(MouseButton::Left)
+}
+
+fn draw_pause(g: &mut Game, ui: &mut Ui) {
+    let r = modal_rect(560.0, 404.0);
+    let body = modal_shell(r, i18n::t("PAUSED", "PAUSE"));
+    let gap = 12.0;
+    let h = 48.0;
+    let mut y = body.y + 10.0;
+    if button(
+        Rect::new(body.x, y, body.w, h),
+        i18n::t("RESUME", "REPRENDRE"),
+        true,
+        true,
+    ) {
+        ui.pause_open = false;
+    }
+    y += h + gap;
+    let can_save = g.anim.is_none() && g.trade.is_none() && g.debt.is_none() && g.phase != Phase::Over;
+    if button(
+        Rect::new(body.x, y, body.w, h),
+        i18n::t("SAVE", "SAUVEGARDER"),
+        can_save,
+        false,
+    ) {
+        match crate::persist::save(g) {
+            Ok(path) => g.log(crate::tr!(
+                "Game saved to {}",
+                "Partie sauvegardée dans {}",
+                path.display()
+            )),
+            Err(err) => g.log(crate::tr!(
+                "Could not save: {}",
+                "Impossible de sauvegarder : {}",
+                err
+            )),
+        }
+    }
+    y += h + gap;
+    if button(
+        Rect::new(body.x, y, body.w, h),
+        i18n::t("RULES OF THE GAME", "RÈGLES DU JEU"),
+        true,
+        false,
+    ) {
+        ui.rules_open = true;
+        ui.rules_page = 0;
+    }
+    y += h + gap;
+    // Anyone at the table can call the vote, even while a bot is playing.
+    let any_human = g.players.iter().any(|player| !player.ai);
+    if button(
+        Rect::new(body.x, y, body.w, h),
+        i18n::t("END THE GAME", "ARRÊTER LA PARTIE"),
+        any_human && g.phase != Phase::Over,
+        false,
+    ) {
+        ui.vote_open = true;
+        ui.vote_agree = g.players.iter().map(|player| player.ai).collect();
+    }
+    y += h + gap + 4.0;
+    centered(
+        i18n::t(
+            "Escape closes this menu",
+            "Échap referme ce menu",
+        ),
+        body.x + body.w * 0.5,
+        y + 10.0,
+        11.5,
+        MUTED,
+    );
 }
 
 fn draw_vote(g: &mut Game, ui: &mut Ui) {

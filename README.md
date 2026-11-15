@@ -35,13 +35,12 @@ every seat be a bot and watch it play itself:
   (the saved game) and the rules of the game; the language and sound switches sit
   in the corner. In game, the **MENU** button at the top of the log asks once and
   takes you back to it.
-- **A real rulebook**: **RULES / RÈGLES** - on the menu, and at the bottom left
-  of the board during play - opens a six-page booklet on cream paper, set in two
-  balanced columns with boxed worked examples: the goal, the setup, a turn, the
-  bank and the board, rent and colour groups, houses and hotels, mortgaging,
-  jail, the cards, auctions, trades, debt and bankruptcy, ending a game by
-  agreement. Turn the pages with the arrows or the keyboard, jump with the dots;
-  the world behind it freezes until you close it.
+- **A real rulebook**: **RULES OF THE GAME / RÈGLES DU JEU** - on the menu, and in
+  the pause menu during play - opens a four-chapter booklet on cream paper, set
+  in two balanced columns: the table, the board, building, and the cards and the
+  end of the game. Each rule is laid out whole, so no section is ever cut by a
+  column break or a page turn; the pages turn with the arrows, the keyboard or
+  the dots, and the table stays frozen until the book is closed.
 - Full rules engine:
   - dice rolling, doubles (and the third-doubles jail rule), GO salary
   - property purchase, rent (including the monopoly double-rent rule),
@@ -59,8 +58,8 @@ every seat be a bot and watch it play itself:
   - **debt and bankruptcy**: sell buildings and mortgage lots to cover a debt,
     or declare bankruptcy; assets pass to the creditor (or the bank) and the
     last solvent player wins
-  - **ending a game early**: anyone can call the vote from **END GAME** at any
-    moment, even in the middle of a bot's turn. Every human has to agree (bots
+  - **ending a game early**: anyone can call the vote from **END THE GAME** in the
+    pause menu, at any moment, even in the middle of a bot's turn. Every human has to agree (bots
     always do); the ranking is by **net worth** -
     cash plus the price of every deed plus its buildings - so the player who
     would have won the long game wins here too
@@ -106,9 +105,13 @@ every seat be a bot and watch it play itself:
 - **Renamable seats**: click a name on the setup screen and type - every player,
   human or bot, can be called whatever you like.
 - Animated token movement, hover tooltips on every tile, live game log.
+- A **pause menu** on **Escape**: the whole table freezes - dice, animations,
+  bots and all - and offers **RESUME**, **SAVE**, the rulebook and **END THE GAME**.
+  It can be opened at any moment, including while a bot is playing, and the same
+  command sits as a button in the bottom-left bar.
 - A **three-column layout** that fills the window: the square board in the middle,
-  the players and the bank on the left, the current instruction, the action
-  buttons and the game log on the right. Buying is decided right there - the
+  the players on the left, the current instruction, the action buttons and the
+  game log on the right. Buying is decided right there - the
   prompt reads *"Vermont Avenue is free"*, the buttons offer **BUY** or **PASS**
   (which opens the auction), and the property's **title deed** floats over the
   board with its full rent table, so the price is visible before you commit.
@@ -128,34 +131,34 @@ still showing the face they landed on:
 
 ![The dice tumbling](docs/dice.gif)
 
-The rulebook - six pages, two columns, worked examples in boxes - one click from
-the menu or from the bottom-left corner of the board:
+The rulebook - four chapters, two columns, every rule laid out whole - one click
+from the menu or from the pause menu:
 
 ![The rules](docs/rules.png)
 
-Everything the board cannot show has its own window: buildings, selling and
-mortgaging, trading properties for cash, auctions, debts, the end-of-game vote,
-the final ranking and the token picker.
+Everything the board cannot show has its own window: the pause menu, buildings,
+selling and mortgaging, trading properties for cash, auctions, debts, the
+end-of-game vote, the final ranking and the token picker.
 
-| Build, sell, mortgage | Read a deed you own |
+| The pause menu (Escape) | Build, sell, mortgage |
 | --- | --- |
-| ![The assets window](docs/assets.png) | ![A deed opened from the assets window](docs/card.png) |
+| ![The pause menu](docs/pause.png) | ![The assets window](docs/assets.png) |
 
-| Trade lots for cash | Auctions |
+| Read a deed you own | Trade lots for cash |
 | --- | --- |
-| ![The trade window](docs/trade.png) | ![An auction](docs/auction.png) |
+| ![A deed opened from the assets window](docs/card.png) | ![The trade window](docs/trade.png) |
 
-| Debt and bankruptcy | Ending a game by agreement |
+| Auctions | Debt and bankruptcy |
 | --- | --- |
-| ![A debt to settle](docs/debt.png) | ![The vote to end the game](docs/vote.png) |
+| ![An auction](docs/auction.png) | ![A debt to settle](docs/debt.png) |
 
-| The final ranking | Hover any tile for its deed |
+| Ending a game by agreement | The final ranking |
 | --- | --- |
-| ![Game over, ranked by net worth](docs/over.png) | ![A title deed on hover](docs/hover.png) |
+| ![The vote to end the game](docs/vote.png) | ![Game over, ranked by net worth](docs/over.png) |
 
-Eight token designs, drawn with primitives:
-
-![Choosing a token](docs/tokens.png)
+| Hover any tile for its deed | Eight token designs |
+| --- | --- |
+| ![A title deed on hover](docs/hover.png) | ![Choosing a token](docs/tokens.png) |
 
 ## Sound
 
@@ -210,9 +213,9 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
 
 ## Saving and loading
 
-- **SAUVEGARDER / SAVE**, next to **END GAME** in the right-hand column, writes
-  the current game at the start or end of your turn (it is disabled while dice
-  are moving, a card is being resolved, or an auction/debt dialog is open).
+- **SAVE / SAUVEGARDER**, in the pause menu, writes the current game at any
+  point where nothing is moving (it is disabled while dice are tumbling, a card
+  is being resolved, or an auction/debt dialog is open).
 - On the setup screen, **CONTINUE GAME** resumes the saved game. It is disabled
   when no save exists.
 - The slot lives at `%APPDATA%\Crazyopoly\savegame.json` on Windows and
@@ -235,15 +238,16 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
    bots) whenever you want to speed things up.
 4. When you land on an unowned property, choose **BUY** or **PASS** (which puts
    the lot up for auction); the deed floating over the board shows every rent.
-5. Use **BUILD / MORTGAGE** to add houses and hotels, or to raise cash;
-   **TRADE** opens the trade window; **END TURN** passes play on.
+5. Use **ASSETS** to add houses and hotels, or to raise cash; **TRADE** opens the
+   trade window; **END TURN** passes play on. **Escape** opens the pause menu.
 6. If you owe more cash than you hold, the debt dialog appears: sell buildings,
    mortgage lots, then pay - or declare bankruptcy.
 7. The last solvent player wins.
 
 Hover over any tile for its price, rent and owner. The log in the right-hand
-column records everything that happens, and **END GAME** starts the vote to stop
-early: the richest player - cash, deeds and buildings - takes the table.
+column records everything that happens, and **END THE GAME** in the pause menu
+starts the vote to stop early: the richest player - cash, deeds and buildings -
+takes the table.
 
 ## Language
 
