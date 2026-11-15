@@ -2119,7 +2119,7 @@ fn draw_right_column(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
     }
     if button(
         Rect::new(p.x + half + gap, y, half, bh),
-        i18n::t("END GAME", "FIN DE PARTIE"),
+        i18n::t("END GAME", "ARRÊTER"),
         input && human,
         false,
     ) {
