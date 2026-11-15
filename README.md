@@ -1,4 +1,4 @@
-# CrazyPoly
+# Crazyopoly
 
 A pixel-faithful, top-down recreation of the classic Monopoly board game in Rust,
 built with [`macroquad`](https://github.com/not-fl3/macroquad). The board and the
@@ -10,10 +10,10 @@ effects, all synthesised from scratch for this game (see **Sound** below).
 
 Base repository: <https://github.com/crazypoly/crazypoly>
 
-A property is offered: the deed floats over the board, the decision sits in the
-right-hand column, and the log follows every move in the players' colours:
+A property is offered: its title deed floats over the board, the decision sits in
+the right-hand column, and the log follows every move in the players' colours:
 
-![CrazyPoly in play](docs/board.png)
+![Crazyopoly in play](docs/buy.png)
 
 ## Features
 
@@ -23,7 +23,7 @@ right-hand column, and the log follows every move in the players' colours:
 - The complete **40-space official board**: all streets, colour groups, prices,
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
-  plus the central card area and dice.
+  plus the dice at the centre of the board.
 - Full rules engine:
   - dice rolling, doubles (and the third-doubles jail rule), GO salary
   - property purchase, rent (including the monopoly double-rent rule),
@@ -68,6 +68,17 @@ right-hand column, and the log follows every move in the players' colours:
   short fanfare when someone wins. Two icon buttons - an equaliser for the
   effects and a note for the music - turn either channel off at any time, on the
   setup screen and in the left column of the board.
+- **Every space shows its own deed**: hover any tile and its title deed opens
+  under the cursor - the rent table for a street, the four rates for a railroad,
+  the 4x / 10x dice multipliers for a utility - with the owner (or *unowned*)
+  written underneath it.
+- **Your deeds on demand**: in **MES BIENS / ASSETS**, click a lot to read its
+  card without leaving the window, even mid-turn.
+- **Fast forward**: the `>>>` button at the bottom of the left column resolves
+  the dice, the walk and every bot decision instantly, so a table of bots plays
+  itself in seconds instead of minutes. Press it again to get the animations back.
+- **Renamable seats**: click a name on the setup screen and type - every player,
+  human or bot, can be called whatever you like.
 - Animated token movement, hover tooltips on every tile, live game log.
 - A **three-column layout** that fills the window: the square board in the middle,
   the players and the bank on the left, the current instruction, the action
@@ -93,17 +104,21 @@ Everything the board cannot show has its own window: building, selling and
 mortgaging, trading properties for cash, auctions, debts, the final ranking and
 the token picker.
 
-| Build, sell, mortgage | Trade lots for cash |
+| Build, sell, mortgage | Read a deed you own |
 | --- | --- |
-| ![The assets window](docs/assets.png) | ![The trade window](docs/trade.png) |
+| ![The assets window](docs/assets.png) | ![A deed opened from the assets window](docs/card.png) |
 
-| Auctions | Debt and bankruptcy |
+| Trade lots for cash | Auctions |
 | --- | --- |
-| ![An auction](docs/auction.png) | ![A debt to settle](docs/debt.png) |
+| ![The trade window](docs/trade.png) | ![An auction](docs/auction.png) |
 
-| Eight token designs | The final ranking |
+| Debt and bankruptcy | The final ranking |
 | --- | --- |
-| ![Choosing a token](docs/tokens.png) | ![Game over](docs/over.png) |
+| ![A debt to settle](docs/debt.png) | ![Game over](docs/over.png) |
+
+Eight token designs, drawn with primitives:
+
+![Choosing a token](docs/tokens.png)
 
 ## Sound
 
@@ -177,7 +192,9 @@ cp target/release/crazypoly.exe dist/CrazyPoly.exe
    game - bots fill any seat you leave to them. Set **every** seat to BOT and the
    game plays itself, which is handy to watch the AI (and the dice) at work.
 2. Press **START GAME**.
-3. On your turn press **ROLL DICE**. Your token walks around the board.
+3. On your turn press **ROLL DICE**. Your token walks around the board; the
+   `>>>` button below the player list fast-forwards the animations (and the
+   bots) whenever you want to speed things up.
 4. When you land on an unowned property, choose **BUY** or **PASS** (which puts
    the lot up for auction); the deed floating over the board shows every rent.
 5. Use **BUILD / MORTGAGE** to add houses and hotels, or to raise cash;

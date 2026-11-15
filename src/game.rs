@@ -192,6 +192,8 @@ pub struct Game {
     /// Set once a bot has offered a trade during its current turn.
     pub bot_offer_done: bool,
     pub winner: Option<usize>,
+    /// Fast forward: every animation is resolved in the frame it starts.
+    pub fast: bool,
 }
 
 impl Game {
@@ -223,11 +225,12 @@ impl Game {
             trade_timer: 0.8,
             bot_offer_done: false,
             winner: None,
+            fast: false,
         };
         let first = game.players[0].name.clone();
         game.log(crate::tr!(
-            "Welcome to CrazyPoly! {} goes first.",
-            "Bienvenue dans CrazyPoly ! {} commence.",
+            "Welcome to Crazyopoly! {} goes first.",
+            "Bienvenue dans Crazyopoly ! {} commence.",
             first
         ));
         game
@@ -379,7 +382,7 @@ impl Game {
         // pointing at the sky, and the recorded poses drive the animation.
         let throw = crate::dice_physics::roll();
         let (d1, d2) = throw.values;
-        self.dice_anim = throw.duration;
+        self.dice_anim = if self.fast { 0.0 } else { throw.duration };
         self.dice_throw = Some(throw);
         self.dice = (d1, d2);
         let name = self.pname(p);
@@ -1636,9 +1639,16 @@ impl Game {
             self.dice_anim = (self.dice_anim - dt).max(0.0);
         }
 
-        // Animate the walking token one tile at a time.
+        // Animate the walking token one tile at a time (instant in fast mode).
         let mut arrived = false;
-        if let Some(a) = self.anim.as_mut() {
+        if self.fast {
+            if let Some(a) = self.anim.take() {
+                if let Some(last) = a.path.last() {
+                    self.players[a.player].pos = *last;
+                }
+                arrived = true;
+            }
+        } else if let Some(a) = self.anim.as_mut() {
             let step = 0.075;
             a.t += dt / step;
             while a.t >= 1.0 {
@@ -1672,6 +1682,9 @@ impl Game {
             None => false,
         };
         if bot_trade {
+            if self.fast {
+                self.trade_timer = 0.0;
+            }
             self.trade_timer -= dt;
             if self.trade_timer <= 0.0 {
                 let accept = ai::evaluate_trade(self);
@@ -1684,6 +1697,9 @@ impl Game {
         }
 
         if self.phase != Phase::Moving && self.awaiting_ai() {
+            if self.fast {
+                self.ai_timer = 0.0;
+            }
             self.ai_timer -= dt;
             if self.ai_timer <= 0.0 {
                 ai::act(self);

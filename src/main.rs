@@ -1,4 +1,4 @@
-// CrazyPoly - a complete, self-contained recreation of the classic Monopoly
+// Crazyopoly - a complete, self-contained recreation of the classic Monopoly
 // board game, written in Rust with the macroquad 2D framework.
 //
 // Base repository: https://github.com/crazypoly/crazypoly
@@ -53,7 +53,7 @@ pub struct App {
 
 fn window_conf() -> Conf {
     Conf {
-        window_title: "CrazyPoly - Monopoly".to_owned(),
+        window_title: "Crazyopoly".to_owned(),
         window_width: 1440,
         window_height: 920,
         window_resizable: true,

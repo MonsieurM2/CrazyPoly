@@ -399,6 +399,41 @@ enum Icon {
     Sfx,
 }
 
+/// A pill that stays lit while its option is on.
+fn toggle_button(r: Rect, label: &str, on: bool) -> bool {
+    let (mx, my) = mouse_position();
+    let hover = inr(r, mx, my);
+    if on {
+        round_rect(
+            r.x,
+            r.y,
+            r.w,
+            r.h,
+            8.0,
+            if hover { GOLD_SOFT } else { GOLD },
+        );
+        centered_bold(label, r.x + r.w * 0.5, r.y + r.h * 0.5, 12.0, BG_DEEP);
+    } else {
+        if hover {
+            round_rect(
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                8.0,
+                Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 },
+            );
+        }
+        round_outline(r.x, r.y, r.w, r.h, 8.0, 1.2, GOLD_DIM);
+        centered_bold(label, r.x + r.w * 0.5, r.y + r.h * 0.5, 12.0, CREAM);
+    }
+    let clicked = hover && is_mouse_button_pressed(MouseButton::Left);
+    if clicked {
+        crate::audio::sfx(crate::audio::Sfx::Click);
+    }
+    clicked
+}
+
 /// Square icon button for the music and the sound effects: a note and an
 /// equaliser, struck through when the channel is off.
 fn sound_button(r: Rect, icon: Icon, on: bool) -> bool {
@@ -512,6 +547,8 @@ fn list_names(g: &Game, tiles: &[usize]) -> String {
 pub struct Ui {
     pub asset_open: bool,
     pub asset_page: usize,
+    /// Lot whose title deed is being read in the asset window.
+    pub asset_card: Option<usize>,
     pub confirm_bankrupt: bool,
 }
 
@@ -520,6 +557,7 @@ impl Ui {
         Ui {
             asset_open: false,
             asset_page: 0,
+            asset_card: None,
             confirm_bankrupt: false,
         }
     }
@@ -602,7 +640,7 @@ fn draw_setup(app: &mut App) {
     let picker_open = app.setup.token_slot.is_some();
 
     round_card(x, y, w, h, 16.0, PANEL_BG, CARD_EDGE);
-    serif_center("CrazyPoly", x + w * 0.5, y + 46.0, 50.0, GOLD_SOFT);
+    serif_center("Crazyopoly", x + w * 0.5, y + 46.0, 50.0, GOLD_SOFT);
     centered(
         i18n::t(
             "The classic property trading game - 1 to 8 players, bots fill empty seats",
@@ -708,7 +746,22 @@ fn draw_setup(app: &mut App) {
                 1.5,
                 GOLD,
             );
+        } else if inr(name_rect, mouse_position().0, mouse_position().1) {
+            round_outline(
+                name_rect.x,
+                name_rect.y,
+                name_rect.w,
+                name_rect.h,
+                8.0,
+                1.0,
+                GOLD_DIM,
+            );
         }
+        // A pencil at the far end of the field: this text can be changed.
+        let pen_x = name_rect.x + name_rect.w - 18.0;
+        let pen_y = name_rect.y + name_rect.h * 0.5;
+        draw_line(pen_x - 4.0, pen_y + 4.0, pen_x + 4.0, pen_y - 4.0, 1.6, GOLD_DIM);
+        draw_line(pen_x - 6.0, pen_y + 6.0, pen_x - 4.0, pen_y + 4.0, 1.6, GOLD_DIM);
         let shown = truncate(&app.setup.slots[i].name, name_rect.w - 16.0, 16.0);
         txt(&shown, name_rect.x + 9.0, name_rect.y + name_rect.h * 0.68, 16.0, TEXT);
         if editing && (get_time() * 2.0) as i64 % 2 == 0 {
@@ -1161,7 +1214,7 @@ fn draw_board(g: &Game, lay: &Layout, mx: f32, my: f32, input: bool) {
     }
     draw_center(g, geo);
     draw_tokens(g, geo);
-    if let Some(tile) = hovered {
+    if let (Some(tile), true) = (hovered, input) {
         draw_tooltip(g, geo, tile, mx, my);
     }
 }
@@ -1392,24 +1445,6 @@ fn draw_tokens(g: &Game, geo: &Geo) {
     }
 }
 
-fn draw_deck_box(top: &str, bottom: &str, x: f32, y: f32, w: f32, h: f32, color: Color) {
-    draw_rectangle(x + 3.0, y + 5.0, w, h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.10 });
-    draw_rectangle(x, y, w, h, TILE);
-    draw_rectangle_lines(x, y, w, h, 1.6, color);
-    centered_bold("?", x + w * 0.20, y + h * 0.33, h * 0.30, color);
-    centered_bold(top, x + w * 0.58, y + h * 0.33, w * 0.095, color);
-    if !bottom.is_empty() {
-        centered(bottom, x + w * 0.58, y + h * 0.52, w * 0.072, INK_SOFT);
-    }
-    centered(
-        i18n::t("PLACE CARD HERE", "POSEZ LA CARTE ICI"),
-        x + w * 0.5,
-        y + h * 0.84,
-        w * 0.052,
-        Color { r: 0.541, g: 0.514, b: 0.443, a: 1.0 },
-    );
-}
-
 /// Small caps with extra letter spacing, as used for the board's subtitle.
 fn spaced_center(text: &str, cx: f32, cy: f32, size: f32, spacing: f32, color: Color) {
     let mut total = 0.0;
@@ -1430,39 +1465,14 @@ fn draw_center(g: &Game, geo: &Geo) {
     draw_rectangle(c.x, c.y, c.w, c.h, CENTER_BG);
     let cx = c.x + c.w * 0.5;
 
-    serif_center("MONOPOLY", cx, c.y + c.h * 0.100, c.w * 0.130, WINE);
-    spaced_center(
-        i18n::t("CRAZYPOLY EDITION", "ÉDITION CRAZYPOLY"),
-        cx,
-        c.y + c.h * 0.172,
-        c.w * 0.026,
-        c.w * 0.005,
-        INK_SOFT,
-    );
+    let title = "CRAZYOPOLY";
+    let mut title_size = c.w * 0.128;
+    while serif_w(title, title_size) > c.w * 0.90 && title_size > 8.0 {
+        title_size -= 1.0;
+    }
+    serif_center(title, cx, c.y + c.h * 0.150, title_size, WINE);
 
-    let bw = c.w * 0.30;
-    let bh = c.h * 0.155;
-    let by = c.y + c.h * 0.245;
-    draw_deck_box(
-        i18n::t("CHANCE", "CHANCE"),
-        i18n::t("GO TO JAIL", "ALLEZ EN PRISON"),
-        c.x + c.w * 0.13,
-        by,
-        bw,
-        bh,
-        Color { r: 0.80, g: 0.20, b: 0.22, a: 1.0 },
-    );
-    draw_deck_box(
-        i18n::t("COMMUNITY", "CAISSE DE"),
-        i18n::t("CHEST", "COMMUNAUTÉ"),
-        c.x + c.w * 0.57,
-        by,
-        bw,
-        bh,
-        Color { r: 0.18, g: 0.36, b: 0.66, a: 1.0 },
-    );
-
-    let dy = c.y + c.h * 0.53;
+    let dy = c.y + c.h * 0.455;
     let ds = (c.w * 0.105).min(c.h * 0.105);
     crate::dice::draw(g, cx, dy, ds);
     serif_center(
@@ -1475,8 +1485,8 @@ fn draw_center(g: &Game, geo: &Geo) {
 
     let player = &g.players[g.turn];
     let label = crate::tr!("{}'s turn", "Tour de {}", player.name);
-    serif_center(&label, cx, c.y + c.h * 0.715, c.w * 0.040, WINE);
-    centered(&phase_hint(g), cx, c.y + c.h * 0.762, c.w * 0.023, INK_SOFT);
+    serif_center(&label, cx, c.y + c.h * 0.705, c.w * 0.040, WINE);
+    centered(&phase_hint(g), cx, c.y + c.h * 0.752, c.w * 0.023, INK_SOFT);
 
     if let Some((text, _)) = &g.banner {
         let bcard_w = c.w * 0.76;
@@ -1542,61 +1552,72 @@ fn phase_hint(g: &Game) -> String {
 
 fn draw_tooltip(g: &Game, geo: &Geo, tile: usize, mx: f32, my: f32) {
     let space = &g.spaces[tile];
-    let mut lines: Vec<(String, f32, Color)> = Vec::new();
-    lines.push((space.name.to_uppercase(), 14.0, TEXT));
-    match space.kind {
-        Kind::Street => {
-            lines.push((
-                format!("{} {}", i18n::t("Group", "Groupe"), group_title(space.group)),
-                11.5,
-                space.group.color(),
-            ));
-            lines.push((format!("{} {}", i18n::t("Price", "Prix"), money(space.price as i64)), 12.0, TEXT_DIM));
-            let h = g.props[tile].houses.min(MAX_HOUSES) as usize;
-            lines.push((format!("{} {}", i18n::t("Rent", "Loyer"), money(space.rent[h] as i64)), 12.0, TEXT_DIM));
-            lines.push((format!("{} {}", i18n::t("Building", "Construction"), money(space.house_cost as i64)), 12.0, TEXT_DIM));
-        }
-        Kind::Railroad => {
-            lines.push((format!("{} {}", i18n::t("Price", "Prix"), money(space.price as i64)), 12.0, TEXT_DIM));
-            lines.push((i18n::t("Rent 25 / 50 / 100 / 200", "Loyer 25 / 50 / 100 / 200").to_string(), 12.0, TEXT_DIM));
-        }
-        Kind::Utility => {
-            lines.push((format!("{} {}", i18n::t("Price", "Prix"), money(space.price as i64)), 12.0, TEXT_DIM));
-            lines.push((i18n::t("Rent 4x or 10x the dice", "Loyer 4x ou 10x les dés").to_string(), 12.0, TEXT_DIM));
-        }
-        Kind::Tax => lines.push((format!("{} {}", i18n::t("Pay", "Payer"), money(space.tax as i64)), 12.0, TEXT_DIM)),
-        _ => lines.push((i18n::t("Special space", "Case spéciale").to_string(), 12.0, TEXT_DIM)),
-    }
-    if let Some(owner) = g.props[tile].owner {
-        lines.push((
-            format!("{} {}", i18n::t("Owned by", "Propriétaire :"), g.players[owner].name),
-            12.0,
-            g.players[owner].color,
-        ));
-        if g.props[tile].mortgaged {
-            lines.push((i18n::t("MORTGAGED", "HYPOTHÉQUÉ").to_string(), 12.0, WARN));
-        }
-    } else if space.purchasable() {
-        lines.push((i18n::t("Unowned", "Libre").to_string(), 12.0, MUTED));
-    }
-
-    let w = 270.0;
-    let pad = 10.0;
-    let h: f32 = lines.iter().map(|(_, s, _)| s * 1.55).sum::<f32>() + pad * 2.0;
-    let mut x = mx + 18.0;
-    let mut y = my + 20.0;
+    let w = (geo.s * 0.28).clamp(180.0, 250.0);
+    let h = w * 1.28;
+    let mut x = mx + 22.0;
     if x + w > geo.x + geo.s {
-        x = mx - w - 16.0;
+        x = mx - w - 20.0;
     }
+    x = x.clamp(6.0, (screen_width() - w - 6.0).max(6.0));
+    let mut y = my + 24.0;
     if y + h > geo.y + geo.s {
-        y = my - h - 16.0;
+        y = my - h - 20.0;
     }
-    draw_rectangle(x, y, w, h, Color { r: 0.08, g: 0.085, b: 0.10, a: 0.97 });
-    draw_rectangle_lines(x, y, w, h, 1.0, PANEL_EDGE);
-    let mut cy = y + pad + 10.0;
-    for (text, size, color) in lines {
-        txt(&truncate(&text, w - pad * 2.0, size), x + pad, cy, size, color);
-        cy += size * 1.55;
+    y = y.clamp(6.0, (screen_height() - h - 34.0).max(6.0));
+
+    if space.purchasable() {
+        deed_card(g, tile, x, y, w, h);
+        let owner = g.props[tile].owner;
+        let line = match owner {
+            Some(p) => {
+                let name = g.players[p].name.clone();
+                if g.props[tile].mortgaged {
+                    crate::tr!("{} - mortgaged", "{} - hypothéqué", name)
+                } else {
+                    crate::tr!("Owned by {}", "À {}", name)
+                }
+            }
+            None => i18n::t("Unowned", "Libre").to_string(),
+        };
+        let color = owner.map(|p| g.players[p].color).unwrap_or(MUTED);
+        round_rect(
+            x,
+            y + h + 4.0,
+            w,
+            22.0,
+            6.0,
+            Color { r: 0.075, g: 0.157, b: 0.114, a: 0.96 },
+        );
+        centered(&truncate(&line, w - 12.0, 11.5), x + w * 0.5, y + h + 19.0, 11.5, color);
+    } else {
+        // Corners, taxes and the card spaces still get a card-shaped note.
+        let ch = h * 0.62;
+        draw_rectangle(x + 4.0, y + 6.0, w, ch, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.18 });
+        draw_rectangle(x, y, w, ch, TILE);
+        draw_rectangle_lines(x, y, w, ch, 1.5, INK_LINE);
+        centered_bold(
+            &space.name.to_uppercase(),
+            x + w * 0.5,
+            y + 34.0,
+            w * 0.070,
+            INK,
+        );
+        let note = match space.kind {
+            Kind::Tax => crate::tr!("Pay {}", "Payez {}", money(space.tax as i64)),
+            Kind::Chance => i18n::t("Draw a Chance card", "Tirez une carte Chance").to_string(),
+            Kind::Chest => {
+                i18n::t("Draw a Community Chest card", "Tirez une carte Caisse de communauté")
+                    .to_string()
+            }
+            Kind::GoToJail => i18n::t("Go to jail", "Allez en prison").to_string(),
+            Kind::Jail => i18n::t("Just visiting", "Simple visite").to_string(),
+            Kind::FreeParking => i18n::t("Free parking", "Parc gratuit").to_string(),
+            Kind::Go => crate::tr!("Collect {}", "Recevez {}", money(200)).to_string(),
+            _ => i18n::t("Special space", "Case spéciale").to_string(),
+        };
+        for (k, line) in wrap(&note, w - 20.0, w * 0.050).iter().take(3).enumerate() {
+            centered(line, x + w * 0.5, y + 58.0 + k as f32 * w * 0.075, w * 0.050, INK_SOFT);
+        }
     }
 }
 
@@ -1723,24 +1744,10 @@ fn log_color(g: &Game, line: &str) -> Color {
     DIM_GREEN
 }
 
-fn draw_left_column(g: &Game, lay: &Layout) {
+fn draw_left_column(g: &mut Game, lay: &Layout) {
     let p = lay.left;
-    let logo = (p.w * 0.20).clamp(26.0, 46.0);
-    serif_left("CrazyPoly", p.x + 2.0, p.y + logo, logo, GOLD_SOFT);
-    txt(
-        &crate::tr!(
-            "Salon edition - {} players",
-            "Édition salon - {} joueurs",
-            g.players.len()
-        ),
-        p.x + 3.0,
-        p.y + logo + 20.0,
-        12.5,
-        CREAM_DIM,
-    );
-
     let n = g.players.len();
-    let top = p.y + logo + 40.0;
+    let top = p.y;
     let reserved = 118.0;
     let avail = (p.y + p.h - reserved - top).max(60.0);
     let gap = (p.w * 0.035).clamp(6.0, 12.0);
@@ -1793,6 +1800,9 @@ fn draw_left_column(g: &Game, lay: &Layout) {
         crate::audio::music_on(),
     ) {
         crate::audio::toggle_music();
+    }
+    if toggle_button(Rect::new(p.x + 152.0, bar, 62.0, 28.0), ">>>", g.fast) {
+        g.fast = !g.fast;
     }
 }
 
@@ -2130,15 +2140,23 @@ fn draw_log(g: &Game, p: Rect, top: f32) {
 /// Title deed of the property being offered, laid over the board.
 fn draw_deed_card(g: &Game, lay: &Layout) {
     let geo = &lay.geo;
-    let space = &g.spaces[g.players[g.turn].pos];
-    if !space.purchasable() {
+    let tile = g.players[g.turn].pos;
+    if !g.spaces[tile].purchasable() {
         return;
     }
-    let w = (geo.s * 0.31).max(150.0);
-    let h = (geo.s * 0.40).max(180.0);
-    let x = geo.x + geo.s * 0.105;
-    let y = geo.y + geo.s * 0.195;
+    deed_card(
+        g,
+        tile,
+        geo.x + geo.s * 0.105,
+        geo.y + geo.s * 0.195,
+        (geo.s * 0.31).max(150.0),
+        (geo.s * 0.40).max(180.0),
+    );
+}
 
+/// The title deed of one lot, drawn as a cream card.
+fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
+    let space = &g.spaces[tile];
     draw_rectangle(x + 5.0, y + 7.0, w, h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.22 });
     draw_rectangle(x, y, w, h, TILE);
     draw_rectangle_lines(x, y, w, h, 1.5, INK_LINE);
@@ -2146,54 +2164,75 @@ fn draw_deed_card(g: &Game, lay: &Layout) {
     let head_h = h * 0.30;
     draw_rectangle(x, y, w, head_h, space.group.color());
     draw_rectangle_lines(x, y, w, head_h, 1.2, INK_LINE);
+    // Dark bands (railroads, utilities) need white lettering.
+    let head_ink = if space.group.street() { INK } else { WHITE };
     spaced_center(
         i18n::t("TITLE DEED", "TITRE DE PROPRIÉTÉ"),
         x + w * 0.5,
         y + head_h * 0.26,
         w * 0.058,
         w * 0.006,
-        INK,
+        head_ink,
     );
     let mut name_size = w * 0.115;
     while serif_w(space.name, name_size) > w - 20.0 && name_size > 8.0 {
         name_size -= 0.5;
     }
-    serif_center(space.name, x + w * 0.5, y + head_h * 0.66, name_size, INK);
+    serif_center(space.name, x + w * 0.5, y + head_h * 0.66, name_size, head_ink);
 
-    let line = (h - head_h - 46.0) / 6.0;
-    let mut ry = y + head_h + line * 0.9;
-    let rows: [(String, u32); 6] = if space.group.street() {
-        [
-            (i18n::t("Rent", "Loyer").to_string(), space.rent[0]),
-            (crate::tr!("With 1 house", "Avec 1 maison"), space.rent[1]),
-            (crate::tr!("With 2 houses", "Avec 2 maisons"), space.rent[2]),
-            (crate::tr!("With 3 houses", "Avec 3 maisons"), space.rent[3]),
-            (crate::tr!("With 4 houses", "Avec 4 maisons"), space.rent[4]),
-            (i18n::t("With a hotel", "Avec un hôtel").to_string(), space.rent[5]),
-        ]
-    } else {
-        [
-            (i18n::t("Price", "Prix").to_string(), space.price),
-            (i18n::t("Rent", "Loyer").to_string(), space.rent[0]),
-            (String::new(), 0),
-            (String::new(), 0),
-            (String::new(), 0),
-            (String::new(), 0),
-        ]
-    };
-    for (label, value) in rows {
-        if label.is_empty() {
-            ry += line;
-            continue;
+    let mut rows: Vec<(String, String)> = Vec::new();
+    if space.group.street() {
+        rows.push((
+            i18n::t("Rent", "Loyer").to_string(),
+            format!("{}$", space.rent[0]),
+        ));
+        let labels = [
+            i18n::t("With 1 house", "Avec 1 maison"),
+            i18n::t("With 2 houses", "Avec 2 maisons"),
+            i18n::t("With 3 houses", "Avec 3 maisons"),
+            i18n::t("With 4 houses", "Avec 4 maisons"),
+        ];
+        for (k, label) in labels.iter().enumerate() {
+            rows.push((label.to_string(), format!("{}$", space.rent[k + 1])));
         }
+        rows.push((
+            i18n::t("With a hotel", "Avec un hôtel").to_string(),
+            format!("{}$", space.rent[5]),
+        ));
+    } else if space.kind == Kind::Railroad {
+        rows.push((
+            i18n::t("Price", "Prix").to_string(),
+            format!("{}$", space.price),
+        ));
+        let labels = [
+            i18n::t("1 railroad", "1 gare"),
+            i18n::t("2 railroads", "2 gares"),
+            i18n::t("3 railroads", "3 gares"),
+            i18n::t("4 railroads", "4 gares"),
+        ];
+        for (k, label) in labels.iter().enumerate() {
+            rows.push((label.to_string(), format!("{}$", 25u32 << k as u32)));
+        }
+    } else {
+        rows.push((
+            i18n::t("Price", "Prix").to_string(),
+            format!("{}$", space.price),
+        ));
+        rows.push((
+            i18n::t("Rent, 1 company", "Loyer, 1 réseau").to_string(),
+            i18n::t("4 x dice", "4 x dés").to_string(),
+        ));
+        rows.push((
+            i18n::t("Rent, 2 companies", "Loyer, 2 réseaux").to_string(),
+            i18n::t("10 x dice", "10 x dés").to_string(),
+        ));
+    }
+
+    let line = (h - head_h - 46.0) / (rows.len() as f32 + 0.6);
+    let mut ry = y + head_h + line * 0.9;
+    for (label, value) in rows {
         txt(&label, x + 14.0, ry, w * 0.062, INK);
-        text_r_bold(
-            &format!("{}$", value),
-            x + w - 14.0,
-            ry,
-            w * 0.062,
-            INK_SOFT,
-        );
+        text_r_bold(&value, x + w - 14.0, ry, w * 0.062, INK_SOFT);
         draw_line(
             x + 12.0,
             ry + line * 0.28,
@@ -2204,18 +2243,27 @@ fn draw_deed_card(g: &Game, lay: &Layout) {
         );
         ry += line;
     }
-    centered(
-        &crate::tr!(
+
+    if g.props[tile].mortgaged {
+        centered(
+            i18n::t("MORTGAGED", "HYPOTHÉQUÉ"),
+            x + w * 0.5,
+            y + h - 42.0,
+            w * 0.055,
+            WARN,
+        );
+    }
+    let foot = if space.group.street() {
+        crate::tr!(
             "Price {} · house {} each",
             "Prix {} · maison {} chacune",
             money(space.price as i64),
             money(space.house_cost as i64)
-        ),
-        x + w * 0.5,
-        y + h - 26.0,
-        w * 0.052,
-        INK_SOFT,
-    );
+        )
+    } else {
+        crate::tr!("Price {}", "Prix {}", money(space.price as i64))
+    };
+    centered(&foot, x + w * 0.5, y + h - 20.0, w * 0.052, INK_SOFT);
 }
 
 fn draw_auction(g: &mut Game) {
@@ -2402,6 +2450,33 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
     let start = ui.asset_page * per_page;
     let slice: Vec<usize> = tiles.iter().skip(start).take(per_page).copied().collect();
 
+    if let Some(tile) = ui.asset_card {
+        if tiles.contains(&tile) {
+            draw_rectangle(
+                0.0,
+                0.0,
+                screen_width(),
+                screen_height(),
+                Color { r: 0.0, g: 0.0, b: 0.0, a: 0.55 },
+            );
+            let w = 300.0;
+            let h = 384.0;
+            let x = (screen_width() - w) * 0.5;
+            let y = (screen_height() - h) * 0.5 - 18.0;
+            deed_card(g, tile, x, y, w, h);
+            if button(
+                Rect::new(x + w * 0.5 - 80.0, y + h + 12.0, 160.0, 38.0),
+                i18n::t("CLOSE", "FERMER"),
+                true,
+                false,
+            ) {
+                ui.asset_card = None;
+            }
+            return;
+        }
+        ui.asset_card = None;
+    }
+
     // Eight lots per column, so the window grows with the longest column.
     let rows_used = slice.len().clamp(1, 8) as f32;
     let r = modal_rect(820.0, (256.0 + rows_used * 48.0).max(320.0));
@@ -2438,7 +2513,7 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
         centered(
             i18n::t("You do not own anything yet.", "Vous ne possédez encore rien."),
             r.x + r.w * 0.5,
-            list_top + 140.0,
+            list_top + 46.0,
             15.0,
             MUTED,
         );
@@ -2456,6 +2531,11 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
             col_w,
             44.0,
         );
+        let (mx, my) = mouse_position();
+        if mx < rr.x + rr.w - 108.0 && inr(rr, mx, my) && is_mouse_button_pressed(MouseButton::Left)
+        {
+            ui.asset_card = Some(*tile);
+        }
         let space = &g.spaces[*tile];
         let gcolor = space.group.color();
         let gtitle = group_title(space.group);
@@ -2529,8 +2609,8 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
     }
     centered(
         i18n::t(
-            "+ build   - sell   M mortgage   U unmortgage",
-            "+ construire   - vendre   M hypothéquer   U lever",
+            "+ build  - sell  M mortgage  U unmortgage  -  click a lot for its deed",
+            "+ construire  - vendre  M hypothéquer  U lever  -  cliquez un bien pour sa carte",
         ),
         r.x + r.w * 0.5,
         footer + 8.0,

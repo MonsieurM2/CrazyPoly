@@ -279,7 +279,7 @@ pub fn save_dir() -> PathBuf {
     if cfg!(windows) {
         if let Ok(appdata) = std::env::var("APPDATA") {
             if !appdata.is_empty() {
-                return PathBuf::from(appdata).join("CrazyPoly");
+                return PathBuf::from(appdata).join("Crazyopoly");
             }
         }
     }
@@ -287,7 +287,7 @@ pub fn save_dir() -> PathBuf {
         return PathBuf::from(home)
             .join(".local")
             .join("share")
-            .join("CrazyPoly");
+            .join("Crazyopoly");
     }
     PathBuf::from(".")
 }
