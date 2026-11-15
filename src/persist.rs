@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::cards::{self, Card, Deck};
 use crate::game::{Game, Phase, Player, Prop, PLAYER_COLORS};
+use crate::i18n;
 
 const SAVE_VERSION: u32 = 1;
 const SAVE_FILE: &str = "savegame.json";
@@ -372,6 +373,11 @@ impl SaveInfo {
         self.names.get(self.turn).cloned().unwrap_or_default()
     }
 
+    /// Local date and time of the save, ready to print in the picker.
+    pub fn stamp(&self) -> String {
+        stamp(self.saved_at)
+    }
+
     /// Whole seconds, for a "three hours ago" style label.
     pub fn age_secs(&self) -> u64 {
         let now = SystemTime::now()
@@ -380,6 +386,17 @@ impl SaveInfo {
             .unwrap_or(0);
         now.saturating_sub(self.saved_at) / 1000
     }
+}
+
+/// Local "2026-11-15 · 13:24" stamp of a slot, written when it was saved.
+pub fn stamp(saved_at: u64) -> String {
+    use chrono::{Local, TimeZone};
+    let secs = (saved_at / 1000) as i64;
+    let Some(dt) = Local.timestamp_opt(secs, 0).single() else {
+        return String::new();
+    };
+    let pattern = i18n::t("%b %d, %Y · %H:%M", "%d/%m/%Y · %H:%M");
+    dt.format(pattern).to_string()
 }
 
 /// Every save on disk, newest first.

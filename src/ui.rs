@@ -1724,11 +1724,18 @@ fn draw_center(g: &Game, geo: &Geo) {
             c.w * 0.003,
             GOLD_DIM,
         );
-        let lines = wrap(text, bcard_w - 24.0, c.w * 0.027);
-        let lh = c.w * 0.034;
-        let start = by2 + bcard_h * 0.38;
-        for (k, line) in lines.iter().take(3).enumerate() {
-            centered(line, bx + bcard_w * 0.5, start + k as f32 * lh, c.w * 0.027, INK);
+        // Naming the player makes the longest cards run to a fourth line, so
+        // the text drops a size rather than losing its end.
+        let mut size = c.w * 0.027;
+        let mut lines = wrap(text, bcard_w - 24.0, size);
+        if lines.len() > 3 {
+            size = c.w * 0.023;
+            lines = wrap(text, bcard_w - 24.0, size);
+        }
+        let lh = size * 1.28;
+        let start = by2 + bcard_h * 0.34;
+        for (k, line) in lines.iter().take(4).enumerate() {
+            centered(line, bx + bcard_w * 0.5, start + k as f32 * lh, size, INK);
         }
     }
 }
@@ -3936,13 +3943,12 @@ fn draw_load(app: &mut App) {
             },
             if hover { GOLD } else { CARD_EDGE },
         );
-        txt(
-            &ago_label(slot.age_secs()),
-            row.x + 16.0,
-            row.y + 21.0,
-            13.0,
-            GOLD_SOFT,
-        );
+        // When it was written, then how long ago that was.
+        let stamp = slot.stamp();
+        txt(&stamp, row.x + 16.0, row.y + 21.0, 13.0, GOLD_SOFT);
+        let age = ago_label(slot.age_secs());
+        let age_x = row.x + 26.0 + text_w(&stamp, 13.0);
+        txt(&age, age_x, row.y + 21.5, 11.5, CREAM_DIM);
         let seats = crate::tr!(
             "{} players",
             "{} joueurs",

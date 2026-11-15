@@ -659,8 +659,10 @@ impl Game {
         } else {
             i18n::t("COMMUNITY CHEST", "CAISSE DE COMMUNAUTÉ")
         };
-        self.log(format!("{} - {}", deck_name, card.text()));
-        self.banner = Some((card.text().to_string(), 5.0));
+        let who = self.pname(self.turn);
+        let text = card.sentence(&who);
+        self.log(format!("{} - {}", deck_name, text));
+        self.banner = Some((text, 5.0));
         sfx(Sfx::Card);
         self.apply_card(card);
     }

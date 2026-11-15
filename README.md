@@ -55,7 +55,11 @@ every seat be a bot and watch it play itself:
   - **jail**: roll for doubles, pay the $50 fine, use a card, or serve three turns
   - **Chance and Community Chest**: all 16 classic cards in each deck
     (advance cards, nearest utility/railroad with the proper rent modifier,
-    repairs, payments to/from every player, Get Out of Jail Free)
+    repairs, payments to/from every player, Get Out of Jail Free), each one
+    printed as a sentence naming the player who drew it - "Joueur 1 avance
+    jusqu'à la compagnie de service public la plus proche...", "Player 2 is
+    fined $15 for speeding." - in the card that flies over the board and in
+    the game log
   - **auctions** when a player declines to buy
   - **trading**: properties plus cash, offered to a human or a bot, which
     evaluates the deal; bots open trades **between themselves** too
@@ -230,8 +234,9 @@ cp target/release/crazyopoly.exe dist/Crazyopoly.exe
 - **Several games at once**: every save gets its own slot, and the eight most
   recent are kept. **CONTINUE / REPRENDRE** - on the menu and on the setup
   screen - resumes the only save straight away, and opens a picker when there
-  are several, each row showing how old it is, how many seats it holds and whose
-  turn it was.
+  are several, each row showing the date and time it was written (e.g.
+  `Nov 15, 2026 · 14:09`, with how long ago that was), how many seats it holds
+  and whose turn it was.
 - The slots live in `%APPDATA%\Crazyopoly\saves` on Windows and
   `~/.local/share/Crazyopoly/saves` elsewhere; a save written by an earlier
   version in `savegame.json` is folded into that folder on first use. Set the

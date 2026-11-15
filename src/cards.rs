@@ -36,6 +36,11 @@ impl Card {
     pub fn text(&self) -> &'static str {
         i18n::t(self.en, self.fr)
     }
+
+    /// The printed sentence, naming the player who drew the card.
+    pub fn sentence(&self, who: &str) -> String {
+        self.text().replacen("{}", who, 1)
+    }
 }
 
 pub struct Deck {
@@ -102,86 +107,86 @@ pub fn chance_cards() -> Vec<Card> {
     use Effect::*;
     vec![
         card(
-            "Advance to GO. Collect $200.",
-            "Avancez jusqu'à la case DÉPART. Recevez 200 $.",
+            "{} advances to GO and collects $200.",
+            "{} avance jusqu'à la case DÉPART et reçoit 200 $.",
             AdvanceToGo,
         ),
         card(
-            "Advance to Illinois Avenue. If you pass GO, collect $200.",
-            "Avancez jusqu'à l'avenue Illinois. Si vous passez par la case DÉPART, recevez 200 $.",
+            "{} advances to Illinois Avenue, collecting $200 if GO is passed.",
+            "{} avance jusqu'à l'avenue Illinois et reçoit 200 $ en passant par la case DÉPART.",
             AdvanceTo(24),
         ),
         card(
-            "Advance to St. Charles Place. If you pass GO, collect $200.",
-            "Avancez jusqu'à la place Saint-Charles. Si vous passez par la case DÉPART, recevez 200 $.",
+            "{} advances to St. Charles Place, collecting $200 if GO is passed.",
+            "{} avance jusqu'à la place Saint-Charles et reçoit 200 $ en passant par la case DÉPART.",
             AdvanceTo(11),
         ),
         card(
-            "Advance to the nearest Utility. If unowned you may buy it. If owned, throw dice and pay the owner ten times the amount thrown.",
-            "Avancez jusqu'à la compagnie de service public la plus proche. Si elle est libre, vous pouvez l'acheter ; sinon, lancez les dés et payez au propriétaire dix fois le montant obtenu.",
+            "{} advances to the nearest utility: free to buy if unowned, otherwise the dice are thrown and ten times the roll goes to its owner.",
+            "{} avance jusqu'à la compagnie de service public la plus proche : libre, elle peut être achetée ; sinon les dés sont lancés et dix fois le montant obtenu revient au propriétaire.",
             NearestUtility,
         ),
         card(
-            "Advance to the nearest Railroad. Pay the owner twice the rental to which they are otherwise entitled.",
-            "Avancez jusqu'à la gare la plus proche. Payez au propriétaire le double du loyer habituel.",
+            "{} advances to the nearest station and pays its owner twice the usual rent.",
+            "{} avance jusqu'à la gare la plus proche et paie au propriétaire le double du loyer habituel.",
             NearestRailroad,
         ),
         card(
-            "Bank pays you dividend of $50.",
-            "La banque vous verse un dividende de 50 $.",
+            "The bank pays {} a dividend of $50.",
+            "La banque verse à {} un dividende de 50 $.",
             Collect(50),
         ),
         card(
-            "Get out of Jail Free. This card may be kept until needed.",
-            "Sortez de prison gratuitement. Cette carte peut être conservée jusqu'à son utilisation.",
+            "{} draws a Get Out of Jail Free card, kept until it is needed.",
+            "{} obtient une carte « Sortez de prison », conservée jusqu'à son utilisation.",
             JailFree,
         ),
         card(
-            "Go back 3 spaces.",
-            "Reculez de trois cases.",
+            "{} goes back three spaces.",
+            "{} recule de trois cases.",
             Back(3),
         ),
         card(
-            "Go to Jail. Go directly to Jail. Do not pass GO, do not collect $200.",
-            "Allez en prison. Rendez-vous directement en prison sans passer par la case DÉPART et sans recevoir 200 $.",
+            "{} goes to Jail directly, without passing GO and without collecting $200.",
+            "{} va directement en prison, sans passer par la case DÉPART et sans recevoir 200 $.",
             GoToJail,
         ),
         card(
-            "Make general repairs on all your property: $25 per house, $100 per hotel.",
-            "Faites des réparations sur tous vos biens : 25 $ par maison, 100 $ par hôtel.",
+            "{} pays for repairs on every building: $25 per house, $100 per hotel.",
+            "{} paie des réparations sur toutes ses constructions : 25 $ par maison, 100 $ par hôtel.",
             Repairs {
                 house: 25,
                 hotel: 100,
             },
         ),
         card(
-            "Speeding fine. Pay $15.",
-            "Amende pour excès de vitesse : payez 15 $.",
+            "{} is fined $15 for speeding.",
+            "{} reçoit une amende de 15 $ pour excès de vitesse.",
             Pay(15),
         ),
         card(
-            "Take a trip to Reading Railroad. If you pass GO, collect $200.",
-            "Faites un voyage jusqu'à la gare de Reading. Si vous passez par la case DÉPART, recevez 200 $.",
+            "{} travels to Reading Station, collecting $200 if GO is passed.",
+            "{} fait un voyage jusqu'à la gare de Reading et reçoit 200 $ en passant par la case DÉPART.",
             AdvanceTo(5),
         ),
         card(
-            "Advance to Boardwalk.",
-            "Avancez jusqu'au Boardwalk.",
+            "{} advances to Boardwalk.",
+            "{} avance jusqu'au Boardwalk.",
             AdvanceTo(39),
         ),
         card(
-            "You have been elected Chairman of the Board. Pay each player $50.",
-            "Vous êtes élu président du conseil. Payez 50 $ à chaque joueur.",
+            "{} is elected Chairman of the Board and pays each player $50.",
+            "{} est élu président du conseil et paie 50 $ à chaque joueur.",
             PayEach(50),
         ),
         card(
-            "Your building loan matures. Collect $150.",
-            "Votre emprunt de construction arrive à échéance. Recevez 150 $.",
+            "The building loan of {} matures: $150 collected.",
+            "L'emprunt de construction de {} arrive à échéance : 150 $ reçus.",
             Collect(150),
         ),
         card(
-            "Advance to the nearest Railroad and pay double rent.",
-            "Avancez jusqu'à la gare la plus proche et payez le double du loyer.",
+            "{} advances to the nearest station and pays double rent.",
+            "{} avance jusqu'à la gare la plus proche et paie le double du loyer.",
             NearestRailroad,
         ),
     ]
@@ -191,86 +196,86 @@ pub fn chest_cards() -> Vec<Card> {
     use Effect::*;
     vec![
         card(
-            "Advance to GO. Collect $200.",
-            "Avancez jusqu'à la case DÉPART. Recevez 200 $.",
+            "{} advances to GO and collects $200.",
+            "{} avance jusqu'à la case DÉPART et reçoit 200 $.",
             AdvanceToGo,
         ),
         card(
-            "Bank error in your favour. Collect $200.",
-            "Erreur de la banque en votre faveur. Recevez 200 $.",
+            "A bank error in the favour of {}: $200 collected.",
+            "Erreur de la banque en faveur de {} : 200 $ reçus.",
             Collect(200),
         ),
         card(
-            "Doctor's fee. Pay $50.",
-            "Frais de médecin : payez 50 $.",
+            "{} pays the doctor's fee of $50.",
+            "{} paie 50 $ de frais de médecin.",
             Pay(50),
         ),
         card(
-            "From sale of stock you get $50.",
-            "Vente de titres : recevez 50 $.",
+            "{} receives $50 from the sale of stock.",
+            "{} reçoit 50 $ de la vente de ses titres.",
             Collect(50),
         ),
         card(
-            "Get out of Jail Free. This card may be kept until needed.",
-            "Sortez de prison gratuitement. Cette carte peut être conservée jusqu'à son utilisation.",
+            "{} draws a Get Out of Jail Free card, kept until it is needed.",
+            "{} obtient une carte « Sortez de prison », conservée jusqu'à son utilisation.",
             JailFree,
         ),
         card(
-            "Go to Jail. Go directly to Jail. Do not pass GO, do not collect $200.",
-            "Allez en prison. Rendez-vous directement en prison sans passer par la case DÉPART et sans recevoir 200 $.",
+            "{} goes to Jail directly, without passing GO and without collecting $200.",
+            "{} va directement en prison, sans passer par la case DÉPART et sans recevoir 200 $.",
             GoToJail,
         ),
         card(
-            "Holiday fund matures. Receive $100.",
-            "Votre caisse de vacances est échue. Recevez 100 $.",
+            "The holiday fund of {} matures: $100 collected.",
+            "La caisse de vacances de {} est échue : 100 $ reçus.",
             Collect(100),
         ),
         card(
-            "Income tax refund. Collect $20.",
-            "Remboursement d'impôt sur le revenu : recevez 20 $.",
+            "{} receives an income tax refund of $20.",
+            "{} reçoit un remboursement d'impôt sur le revenu de 20 $.",
             Collect(20),
         ),
         card(
-            "It is your birthday. Collect $10 from every player.",
-            "C'est votre anniversaire. Recevez 10 $ de chaque joueur.",
+            "It is the birthday of {}: $10 collected from every player.",
+            "C'est l'anniversaire de {} : 10 $ reçus de chaque joueur.",
             CollectFromEach(10),
         ),
         card(
-            "Life insurance matures. Collect $100.",
-            "Votre assurance-vie est échue. Recevez 100 $.",
+            "The life insurance of {} matures: $100 collected.",
+            "L'assurance-vie de {} est échue : 100 $ reçus.",
             Collect(100),
         ),
         card(
-            "Pay hospital fees of $100.",
-            "Frais d'hôpital : payez 100 $.",
+            "{} pays hospital fees of $100.",
+            "{} paie 100 $ de frais d'hôpital.",
             Pay(100),
         ),
         card(
-            "Pay school fees of $50.",
-            "Frais de scolarité : payez 50 $.",
+            "{} pays school fees of $50.",
+            "{} paie 50 $ de frais de scolarité.",
             Pay(50),
         ),
         card(
-            "Receive $25 consultancy fee.",
-            "Honoraires de conseil : recevez 25 $.",
+            "{} receives a consultancy fee of $25.",
+            "{} reçoit 25 $ d'honoraires de conseil.",
             Collect(25),
         ),
         card(
-            "You are assessed for street repairs: $40 per house, $115 per hotel.",
-            "Réparations de voirie : 40 $ par maison, 115 $ par hôtel.",
+            "{} pays for street repairs: $40 per house, $115 per hotel.",
+            "{} paie des réparations de voirie : 40 $ par maison, 115 $ par hôtel.",
             Repairs {
                 house: 40,
                 hotel: 115,
             },
         ),
         card(
-            "You have won second prize in a beauty contest. Collect $10.",
-            "Vous avez remporté le deuxième prix au concours de beauté. Recevez 10 $.",
+            "{} wins second prize in a beauty contest: $10.",
+            "{} remporte le deuxième prix du concours de beauté : 10 $.",
             Collect(10),
         ),
         card(
-            "You inherit $100.",
-            "Vous héritez de 100 $.",
+            "{} inherits $100.",
+            "{} hérite de 100 $.",
             Collect(100),
         ),
     ]
