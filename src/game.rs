@@ -1093,11 +1093,7 @@ impl Game {
         {
             return false;
         }
-        if h == 4 {
-            self.hotels_left > 0
-        } else {
-            self.houses_left > 0
-        }
+        true
     }
 
     pub fn build_house(&mut self, tile: usize) -> bool {
@@ -1112,14 +1108,7 @@ impl Game {
         self.players[p].cash -= cost;
         sfx(Sfx::Build);
         let h = self.props[tile].houses;
-        if h == 4 {
-            self.props[tile].houses = 5;
-            self.hotels_left -= 1;
-            self.houses_left += 4;
-        } else {
-            self.props[tile].houses = h + 1;
-            self.houses_left -= 1;
-        }
+        self.props[tile].houses = if h == 4 { 5 } else { h + 1 };
         let name = self.spaces[tile].name;
         let what = if self.props[tile].houses == 5 {
             i18n::t("a hotel", "un hôtel")
@@ -1155,9 +1144,6 @@ impl Game {
         if group.iter().any(|i| self.props[*i].houses > h) {
             return false;
         }
-        if h == 5 && self.houses_left < 4 {
-            return false;
-        }
         true
     }
 
@@ -1169,14 +1155,7 @@ impl Game {
         let cost = self.spaces[tile].house_cost as i64;
         let h = self.props[tile].houses;
         let refund = if h == 5 { cost * 5 / 2 } else { cost / 2 };
-        if h == 5 {
-            self.props[tile].houses = 4;
-            self.hotels_left += 1;
-            self.houses_left -= 4;
-        } else {
-            self.props[tile].houses = h - 1;
-            self.houses_left += 1;
-        }
+        self.props[tile].houses = if h == 5 { 4 } else { h - 1 };
         self.players[p].cash += refund;
         let name = self.spaces[tile].name;
         self.log(crate::tr!(
@@ -1608,6 +1587,41 @@ impl Game {
                 "{} possède tout le plateau - partie terminée !",
                 name
             ));
+        }
+    }
+
+    /// Ends the game early: the richest player (cash + deeds + buildings) wins.
+    pub fn finish_early(&mut self) {
+        if self.phase == Phase::Over {
+            return;
+        }
+        let mut best: Option<usize> = None;
+        let mut top = i64::MIN;
+        for p in 0..self.players.len() {
+            if self.players[p].bankrupt {
+                continue;
+            }
+            let worth = self.net_worth(p);
+            if worth > top {
+                top = worth;
+                best = Some(p);
+            }
+        }
+        self.winner = best;
+        self.phase = Phase::Over;
+        self.anim = None;
+        self.auction = None;
+        self.trade = None;
+        self.debt = None;
+        if let Some(w) = best {
+            let name = self.pname(w);
+            self.log(crate::tr!(
+                "The table stops here - {} wins with {}.",
+                "La table s'arrête là - {} l'emporte avec {}.",
+                name,
+                top
+            ));
+            sfx(Sfx::Win);
         }
     }
 

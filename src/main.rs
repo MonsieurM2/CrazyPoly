@@ -40,6 +40,7 @@ use ui::{Setup, Ui};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
+    Menu,
     Setup,
     Play,
 }
@@ -74,7 +75,7 @@ async fn main() {
     );
 
     let mut app = App {
-        screen: Screen::Setup,
+        screen: Screen::Menu,
         setup: Setup::default(),
         ui: Ui::new(),
         game: None,

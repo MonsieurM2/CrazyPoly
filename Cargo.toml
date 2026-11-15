@@ -1,8 +1,8 @@
 [package]
-name = "crazypoly"
+name = "crazyopoly"
 version = "0.1.0"
 edition = "2021"
-description = "A faithful top-down recreation of the classic Monopoly board game"
+description = "Crazyopoly: a deluxe, top-down Monopoly-like board game with bots"
 license = "MIT"
 
 [dependencies]

@@ -293,9 +293,9 @@ pub fn save_dir() -> PathBuf {
 }
 
 pub fn save_path() -> PathBuf {
-    // CRAZYPOLY_SAVE lets you keep the save file somewhere else (portable
+    // CRAZYOPOLY_SAVE lets you keep the save file somewhere else (portable
     // installs, tests). Otherwise the platform data folder is used.
-    if let Ok(custom) = std::env::var("CRAZYPOLY_SAVE") {
+    if let Ok(custom) = std::env::var("CRAZYOPOLY_SAVE") {
         if !custom.trim().is_empty() {
             return PathBuf::from(custom);
         }

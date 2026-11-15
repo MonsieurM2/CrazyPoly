@@ -15,6 +15,11 @@ the right-hand column, and the log follows every move in the players' colours:
 
 ![Crazyopoly in play](docs/buy.png)
 
+Start it, press **NEW GAME**, pick your token, and the table is yours - or let
+every seat be a bot and watch it play itself:
+
+![The main menu](docs/menu.png)
+
 ## Features
 
 - **1 to 8 players** on one shared screen (hot-seat), with an **AI bot** toggle for
@@ -24,12 +29,19 @@ the right-hand column, and the log follows every move in the players' colours:
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
   plus the dice at the centre of the board.
+- A **main menu** with **NEW GAME**, **CONTINUE** (the saved game), and the
+  **RULES** of the game in two columns; the language and sound switches sit in
+  the corner. In game, the **MENU** button at the top of the log asks once and
+  takes you back to it.
+- **Rules at any time**: a **RÈGLES / RULES** button - on the menu and in the
+  right-hand column during play - opens the twelve rules of the table over a
+  dimmed board, and closes on the same click.
 - Full rules engine:
   - dice rolling, doubles (and the third-doubles jail rule), GO salary
   - property purchase, rent (including the monopoly double-rent rule),
     railroad rent by count, utilities at 4x / 10x the dice
-  - **houses and hotels** with even-build/even-sell rules and the 32-house /
-    12-hotel bank supply
+  - **houses and hotels** with even-build/even-sell rules - and **no limit**:
+    the bank always has another house, another hotel and more money
   - **mortgaging** and lifting mortgages (with 10% interest)
   - **jail**: roll for doubles, pay the $50 fine, use a card, or serve three turns
   - **Chance and Community Chest**: all 16 classic cards in each deck
@@ -41,6 +53,10 @@ the right-hand column, and the log follows every move in the players' colours:
   - **debt and bankruptcy**: sell buildings and mortgage lots to cover a debt,
     or declare bankruptcy; assets pass to the creditor (or the bank) and the
     last solvent player wins
+  - **ending a game early**: anyone can call the vote from **END GAME**. Every
+    human has to agree (bots always do); the ranking is by **net worth** -
+    cash plus the price of every deed plus its buildings - so the player who
+    would have won the long game wins here too
 - **French and English** interface, switchable at any time with the **FR / EN**
   button under the player list and on the setup screen. French is the default; street
   names stay in English to match the classic board.
@@ -70,8 +86,9 @@ the right-hand column, and the log follows every move in the players' colours:
   setup screen and in the left column of the board.
 - **Every space shows its own deed**: hover any tile and its title deed opens
   under the cursor - the rent table for a street, the four rates for a railroad,
-  the 4x / 10x dice multipliers for a utility - with the owner (or *unowned*)
-  written underneath it.
+  the 4x / 10x dice multipliers for a utility. The owner - a colour dot and a
+  name, or *Unowned* in grey - sits in a cream plate at the foot of the card,
+  drawn in the same cream-and-gold style as the rest of it.
 - **Your deeds on demand**: in **MES BIENS / ASSETS**, click a lot to read its
   card without leaving the window, even mid-turn.
 - **Fast forward**: the `>>>` button at the bottom of the left column resolves
@@ -89,20 +106,26 @@ the right-hand column, and the log follows every move in the players' colours:
 
 ## Screenshots
 
+Every capture below is taken in English, cropped to the window itself.
+
 The setup screen - 2 to 8 seats, each one HUMAN or BOT, a token design per seat
 and the FR / EN switch:
 
 ![Setup screen](docs/setup.png)
 
 A throw in progress: the cubes tumble, bounce and land, and the upper face of
-each one is the result (`3 + 6 = 9` here). Once they have stopped they hop back
-to their home spots, still showing the face they landed on:
+each one is the result. Once they have stopped they hop back to their home spots,
+still showing the face they landed on:
 
-![Dice in flight](docs/throw.png)
+![The dice tumbling](docs/dice.gif)
 
-Everything the board cannot show has its own window: building, selling and
-mortgaging, trading properties for cash, auctions, debts, the final ranking and
-the token picker.
+The rules of the table, one click from the menu or from the board:
+
+![The rules](docs/rules.png)
+
+Everything the board cannot show has its own window: buildings, selling and
+mortgaging, trading properties for cash, auctions, debts, the end-of-game vote,
+the final ranking and the token picker.
 
 | Build, sell, mortgage | Read a deed you own |
 | --- | --- |
@@ -112,9 +135,13 @@ the token picker.
 | --- | --- |
 | ![The trade window](docs/trade.png) | ![An auction](docs/auction.png) |
 
-| Debt and bankruptcy | The final ranking |
+| Debt and bankruptcy | Ending a game by agreement |
 | --- | --- |
-| ![A debt to settle](docs/debt.png) | ![Game over](docs/over.png) |
+| ![A debt to settle](docs/debt.png) | ![The vote to end the game](docs/vote.png) |
+
+| The final ranking | Hover any tile for its deed |
+| --- | --- |
+| ![Game over, ranked by net worth](docs/over.png) | ![A title deed on hover](docs/hover.png) |
 
 Eight token designs, drawn with primitives:
 
@@ -159,16 +186,16 @@ To build only:
 cargo build --release
 ```
 
-The binary is at `target/release/crazypoly` (`crazypoly.exe` on Windows).
+The binary is at `target/release/crazyopoly` (`crazyopoly.exe` on Windows).
 
 ## Prebuilt executable
 
-`dist/CrazyPoly.exe` is a ready-to-run Windows build: double-click it, no Rust
+`dist/Crazyopoly.exe` is a ready-to-run Windows build: double-click it, no Rust
 toolchain needed. Rebuild and refresh it with:
 
 ```bash
 cargo build --release
-cp target/release/crazypoly.exe dist/CrazyPoly.exe
+cp target/release/crazyopoly.exe dist/Crazyopoly.exe
 ```
 
 ## Saving and loading
@@ -178,15 +205,16 @@ cp target/release/crazypoly.exe dist/CrazyPoly.exe
   auction/debt dialog is open).
 - On the setup screen, **CONTINUE GAME** resumes the saved game. It is disabled
   when no save exists.
-- The slot lives at `%APPDATA%\CrazyPoly\savegame.json` on Windows and
-  `~/.local/share/CrazyPoly/savegame.json` elsewhere. Set the `CRAZYPOLY_SAVE`
+- The slot lives at `%APPDATA%\Crazyopoly\savegame.json` on Windows and
+  `~/.local/share/Crazyopoly/savegame.json` elsewhere. Set the `CRAZYOPOLY_SAVE`
   environment variable to any file path to use a different location.
 - The save holds players, cash, deeds, buildings, mortgages, the bank supply,
   turn order, dice and both card decks in their current order.
 
 ## How to play
 
-1. On the setup screen choose **PLAYERS** (2-8 seats). Each seat can be
+1. Press **NEW GAME** on the main menu (or **CONTINUE** to resume a save), then on
+   the setup screen choose **PLAYERS** (2-8 seats). Each seat can be
    **HUMAN** or **BOT**; click a name to type a new one, and click the token on
    the left to pick another design. With one human and one bot you have a solo
    game - bots fill any seat you leave to them. Set **every** seat to BOT and the
@@ -203,8 +231,9 @@ cp target/release/crazypoly.exe dist/CrazyPoly.exe
    mortgage lots, then pay - or declare bankruptcy.
 7. The last solvent player wins.
 
-Hover over any tile for its price, rent and owner. The log under the player list
-records everything that happens.
+Hover over any tile for its price, rent and owner. The log in the right-hand
+column records everything that happens, and **END GAME** starts the vote to stop
+early: the richest player - cash, deeds and buildings - takes the table.
 
 ## Language
 

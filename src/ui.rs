@@ -550,6 +550,11 @@ pub struct Ui {
     /// Lot whose title deed is being read in the asset window.
     pub asset_card: Option<usize>,
     pub confirm_bankrupt: bool,
+    pub rules_open: bool,
+    /// Vote to end the game early: one "agreed" flag per seat.
+    pub vote_open: bool,
+    pub vote_agree: Vec<bool>,
+    pub quit_confirm: bool,
 }
 
 impl Ui {
@@ -559,6 +564,10 @@ impl Ui {
             asset_page: 0,
             asset_card: None,
             confirm_bankrupt: false,
+            rules_open: false,
+            vote_open: false,
+            vote_agree: Vec::new(),
+            quit_confirm: false,
         }
     }
 }
@@ -599,6 +608,16 @@ impl Default for Setup {
 }
 
 impl Setup {
+    /// Keeps the generated names in the language currently on screen.
+    pub fn relabel_defaults(&mut self) {
+        for (i, slot) in self.slots.iter_mut().enumerate() {
+            let n = i + 1;
+            if slot.name == format!("Player {}", n) || slot.name == format!("Joueur {}", n) {
+                slot.name = format!("{} {}", i18n::t("Player", "Joueur"), n);
+            }
+        }
+    }
+
     pub fn build_players(&self) -> Vec<crate::game::Player> {
         (0..self.count)
             .map(|i| {
@@ -621,6 +640,7 @@ impl Setup {
 
 pub fn frame(app: &mut App) {
     match app.screen {
+        Screen::Menu => draw_menu(app),
         Screen::Setup => draw_setup(app),
         Screen::Play => draw_play(app),
     }
@@ -651,8 +671,12 @@ fn draw_setup(app: &mut App) {
         13.5,
         TEXT_DIM,
     );
+    if !picker_open && button(Rect::new(x + 18.0, y + 14.0, 76.0, 30.0), i18n::t("MENU", "MENU"), true, false) {
+        app.screen = Screen::Menu;
+    }
     if !picker_open && button(Rect::new(x + w - 70.0, y + 14.0, 54.0, 30.0), i18n::code(), true, false) {
         i18n::toggle();
+        app.setup.relabel_defaults();
     }
     if !picker_open
         && sound_button(
@@ -1095,6 +1119,9 @@ enum Modal {
     Auction,
     Debt,
     Over,
+    Rules,
+    Vote,
+    Quit,
 }
 
 fn buying(g: &Game) -> bool {
@@ -1107,6 +1134,15 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
     }
     if g.dice_anim > 0.0 {
         return Modal::Waiting;
+    }
+    if ui.rules_open {
+        return Modal::Rules;
+    }
+    if ui.vote_open {
+        return Modal::Vote;
+    }
+    if ui.quit_confirm {
+        return Modal::Quit;
     }
     if ui.asset_open {
         return Modal::Assets;
@@ -1149,6 +1185,16 @@ fn draw_play(app: &mut App) {
         Modal::Auction => draw_auction(g),
         Modal::Debt => draw_debt(g, ui),
         Modal::Over => again = draw_over(g),
+        Modal::Rules => draw_rules(ui),
+        Modal::Vote => draw_vote(g, ui),
+        Modal::Quit => {
+            if draw_quit(ui) {
+                *game = None;
+                *ui = Ui::new();
+                *screen = Screen::Menu;
+                return;
+            }
+        }
     }
     if again {
         *game = None;
@@ -1567,28 +1613,6 @@ fn draw_tooltip(g: &Game, geo: &Geo, tile: usize, mx: f32, my: f32) {
 
     if space.purchasable() {
         deed_card(g, tile, x, y, w, h);
-        let owner = g.props[tile].owner;
-        let line = match owner {
-            Some(p) => {
-                let name = g.players[p].name.clone();
-                if g.props[tile].mortgaged {
-                    crate::tr!("{} - mortgaged", "{} - hypothéqué", name)
-                } else {
-                    crate::tr!("Owned by {}", "À {}", name)
-                }
-            }
-            None => i18n::t("Unowned", "Libre").to_string(),
-        };
-        let color = owner.map(|p| g.players[p].color).unwrap_or(MUTED);
-        round_rect(
-            x,
-            y + h + 4.0,
-            w,
-            22.0,
-            6.0,
-            Color { r: 0.075, g: 0.157, b: 0.114, a: 0.96 },
-        );
-        centered(&truncate(&line, w - 12.0, 11.5), x + w * 0.5, y + h + 19.0, 11.5, color);
     } else {
         // Corners, taxes and the card spaces still get a card-shaped note.
         let ch = h * 0.62;
@@ -1770,12 +1794,7 @@ fn draw_left_column(g: &mut Game, lay: &Layout) {
             CREAM_DIM,
         );
         serif_left(
-            &crate::tr!(
-                "{} houses / {} hotels",
-                "{} M / {} H",
-                g.houses_left,
-                g.hotels_left
-            ),
+            i18n::t("Unlimited", "Illimitée"),
             r.x + 16.0,
             r.y + bank_h - 16.0,
             21.0,
@@ -2088,15 +2107,36 @@ fn draw_right_column(g: &mut Game, ui: &mut Ui, lay: &Layout, input: bool) {
     ) {
         g.end_turn();
     }
-    y += bh + gap + 4.0;
+    y += bh + gap;
 
-    draw_log(g, p, y);
+    if button(
+        Rect::new(p.x, y, half, bh),
+        i18n::t("RULES", "RÈGLES"),
+        input,
+        false,
+    ) {
+        ui.rules_open = true;
+    }
+    if button(
+        Rect::new(p.x + half + gap, y, half, bh),
+        i18n::t("END GAME", "FIN DE PARTIE"),
+        input && human,
+        false,
+    ) {
+        ui.vote_open = true;
+        ui.vote_agree = g.players.iter().map(|player| player.ai).collect();
+    }
+    y += bh + gap + 2.0;
+
+    if draw_log(g, p, y, input) {
+        ui.quit_confirm = true;
+    }
 }
 
-fn draw_log(g: &Game, p: Rect, top: f32) {
+fn draw_log(g: &Game, p: Rect, top: f32, input: bool) -> bool {
     let h = p.y + p.h - top;
     if h < 56.0 {
-        return;
+        return false;
     }
     round_card(p.x, top, p.w, h, 14.0, CARD, CARD_EDGE);
     spaced_left(
@@ -2107,6 +2147,10 @@ fn draw_log(g: &Game, p: Rect, top: f32) {
         1.7,
         GOLD_DIM,
     );
+    let mut back = false;
+    if small_button(Rect::new(p.x + p.w - 64.0, top + 9.0, 50.0, 22.0), i18n::t("MENU", "MENU"), input) {
+        back = true;
+    }
     let size = (p.w * 0.042).clamp(10.0, 12.0);
     let line_h = size * 1.35;
     let max_lines = (((h - 40.0) / line_h).floor() as usize).max(1);
@@ -2125,7 +2169,7 @@ fn draw_log(g: &Game, p: Rect, top: f32) {
         entry.append(&mut lines);
         lines = entry;
     }
-    let mut cy = top + 38.0 + size;
+    let mut cy = top + 42.0 + size;
     for (text, color, bullet) in lines {
         if bullet {
             draw_circle(p.x + 20.0, cy - size * 0.32, 3.0, color);
@@ -2133,6 +2177,7 @@ fn draw_log(g: &Game, p: Rect, top: f32) {
         txt(&text, p.x + 30.0, cy, size, color);
         cy += line_h;
     }
+    back
 }
 
 // ------------------------------------------------------------------- modals
@@ -2228,7 +2273,7 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
         ));
     }
 
-    let line = (h - head_h - 46.0) / (rows.len() as f32 + 0.6);
+    let line = (h - head_h - 68.0) / (rows.len() as f32 + 0.6);
     let mut ry = y + head_h + line * 0.9;
     for (label, value) in rows {
         txt(&label, x + 14.0, ry, w * 0.062, INK);
@@ -2244,15 +2289,6 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
         ry += line;
     }
 
-    if g.props[tile].mortgaged {
-        centered(
-            i18n::t("MORTGAGED", "HYPOTHÉQUÉ"),
-            x + w * 0.5,
-            y + h - 42.0,
-            w * 0.055,
-            WARN,
-        );
-    }
     let foot = if space.group.street() {
         crate::tr!(
             "Price {} · house {} each",
@@ -2263,7 +2299,42 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
     } else {
         crate::tr!("Price {}", "Prix {}", money(space.price as i64))
     };
-    centered(&foot, x + w * 0.5, y + h - 20.0, w * 0.052, INK_SOFT);
+    centered(&foot, x + w * 0.5, y + h - 34.0, w * 0.052, INK_SOFT);
+
+    // Owner plate, in the same cream-and-gold language as the rest of the card.
+    let band_h = 24.0;
+    draw_rectangle(
+        x,
+        y + h - band_h,
+        w,
+        band_h,
+        Color { r: 0.929, g: 0.906, b: 0.839, a: 1.0 },
+    );
+    draw_line(x, y + h - band_h, x + w, y + h - band_h, 1.2, GOLD_DIM);
+    let mortgaged = g.props[tile].mortgaged;
+    let (label, dot) = match g.props[tile].owner {
+        Some(p) => (
+            if mortgaged {
+                crate::tr!("{} - mortgaged", "{} - hypothéqué", g.players[p].name)
+            } else {
+                g.players[p].name.clone()
+            },
+            g.players[p].color,
+        ),
+        None => (
+            i18n::t("Unowned", "Libre").to_string(),
+            Color { r: 0.541, g: 0.514, b: 0.443, a: 1.0 },
+        ),
+    };
+    draw_circle(x + 14.0, y + h - band_h * 0.5, 3.6, dot);
+    let ink = if mortgaged { WARN } else { INK_SOFT };
+    centered(
+        &truncate(&label, w - 36.0, 11.5),
+        x + w * 0.5 + 6.0,
+        y + h - band_h * 0.5 + 4.0,
+        11.5,
+        ink,
+    );
 }
 
 fn draw_auction(g: &mut Game) {
@@ -2929,3 +3000,368 @@ fn draw_over(g: &mut Game) -> bool {
     false
 }
 
+
+
+// ------------------------------------------------------------ menu & dialogs
+
+const RULES: [(&str, &str); 12] = [
+    (
+        "Goal: finish with the most money - cash, deeds and buildings all count.",
+        "But : terminer avec le plus d'argent - liquide, biens et constructions comptent.",
+    ),
+    (
+        "Turn: roll the dice, your token walks, then the space decides what happens.",
+        "Tour : lancez les dés, votre pion avance, puis la case décide de la suite.",
+    ),
+    (
+        "Buying: buy the lot you land on, or pass - passing sends it to auction.",
+        "Achat : achetez la case, ou passez - elle part alors aux enchères.",
+    ),
+    (
+        "Rent: a full colour group doubles the base rent of every street in it.",
+        "Loyer : un groupe complet double le loyer de base de ses rues.",
+    ),
+    (
+        "Houses: build evenly across a group, and a hotel replaces four houses.",
+        "Maisons : construisez équitablement, un hôtel remplace quatre maisons.",
+    ),
+    (
+        "Mortgage: half the price in cash now, lift it later for 10% interest.",
+        "Hypothèque : la moitié du prix tout de suite, levée plus tard avec 10 % d'intérêts.",
+    ),
+    (
+        "Jail: roll doubles, pay the fine, play a card, or wait three turns.",
+        "Prison : double, amende, carte de sortie, ou trois tentatives.",
+    ),
+    (
+        "Cards: Chance and Community Chest bring money, moves, repairs and jail.",
+        "Cartes : Chance et Caisse apportent argent, déplacements, réparations et prison.",
+    ),
+    (
+        "Trading: swap lots and cash with any other player, bot or human.",
+        "Échange : troquez biens et argent avec n'importe quel joueur, bot ou humain.",
+    ),
+    (
+        "Debt: sell buildings and mortgage lots to pay, or declare bankruptcy.",
+        "Dette : vendez et hypothéquez pour payer, sinon c'est la faillite.",
+    ),
+    (
+        "Fast forward: the >>> button skips every animation and bot delay.",
+        "Accéléré : le bouton >>> passe les animations et les attentes des bots.",
+    ),
+    (
+        "Ending: the table can stop early by agreement; the richest player wins.",
+        "Fin : la table peut s'arrêter d'un commun accord ; le plus riche gagne.",
+    ),
+];
+
+fn draw_menu(app: &mut App) {
+    felt_background();
+    let sw = screen_width();
+    let sh = screen_height();
+    let cx = sw * 0.5;
+    let locked = app.ui.rules_open;
+
+    // Gilt frame and a quiet lattice of lines, like the edge of a board.
+    draw_rectangle_lines(14.0, 14.0, sw - 28.0, sh - 28.0, 2.0, Color { r: 0.843, g: 0.706, b: 0.396, a: 0.16 });
+    draw_rectangle_lines(20.0, 20.0, sw - 40.0, sh - 40.0, 1.0, Color { r: 0.843, g: 0.706, b: 0.396, a: 0.07 });
+    for k in 0..4 {
+        let size = (sh * (0.30 + k as f32 * 0.055)).min(sw * 0.44);
+        draw_rectangle_lines(
+            cx - size * 0.5,
+            sh * 0.055,
+            size,
+            size,
+            1.0,
+            Color { r: 1.0, g: 1.0, b: 1.0, a: 0.035 },
+        );
+    }
+
+    let mut size = (sw * 0.085).clamp(46.0, 104.0);
+    let title = "Crazyopoly";
+    while serif_w(title, size) > sw * 0.70 && size > 20.0 {
+        size -= 1.0;
+    }
+    serif_center(title, cx, sh * 0.176, size, GOLD_SOFT);
+    spaced_center(
+        i18n::t("THE PROPERTY TRADING GAME", "LE JEU DE NÉGOCE IMMOBILIER"),
+        cx,
+        sh * 0.262,
+        (sw * 0.0085).clamp(10.0, 15.0),
+        3.2,
+        CREAM_DIM,
+    );
+    draw_line(
+        cx - sw * 0.085,
+        sh * 0.292,
+        cx + sw * 0.085,
+        sh * 0.292,
+        1.4,
+        GOLD_DIM,
+    );
+
+    let w = (sw * 0.34).clamp(300.0, 440.0);
+    let bh = 54.0;
+    let gap = 12.0;
+    let card_h = 3.0 * bh + 2.0 * gap + 36.0;
+    let x = cx - w * 0.5;
+    let y = sh * 0.372;
+    round_card(x, y, w, card_h, 18.0, PANEL_BG, CARD_EDGE);
+
+    let mut by = y + 18.0;
+    if !locked
+        && button(
+            Rect::new(x + 18.0, by, w - 36.0, bh),
+            i18n::t("NEW GAME", "NOUVELLE PARTIE"),
+            true,
+            true,
+        )
+    {
+        app.screen = Screen::Setup;
+    }
+    by += bh + gap;
+    if !locked
+        && button(
+            Rect::new(x + 18.0, by, w - 36.0, bh),
+            i18n::t("CONTINUE", "REPRENDRE"),
+            crate::persist::has_save(),
+            false,
+        )
+    {
+        if let Ok(game) = crate::persist::load() {
+            app.game = Some(game);
+            app.ui = Ui::new();
+            app.screen = Screen::Play;
+        }
+    }
+    by += bh + gap;
+    if !locked
+        && button(
+            Rect::new(x + 18.0, by, w - 36.0, bh),
+            i18n::t("RULES OF THE GAME", "RÈGLES DU JEU"),
+            true,
+            false,
+        )
+    {
+        app.ui.rules_open = true;
+    }
+
+    // The eight tokens, waiting to be picked.
+    let step = (sw * 0.05).clamp(46.0, 66.0);
+    let start = cx - step * 3.5;
+    for k in 0..TOKENS.len() {
+        let x = start + step * k as f32;
+        let ty = y + card_h + 54.0;
+        draw_circle(x, ty, step * 0.34, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.22 });
+        tokens::draw(k, TOKENS[k], x, ty, step * 0.30);
+    }
+
+    // Three quiet promises under the tokens.
+    let bullet = " • ";
+    let join = format!(
+        "{}{}{}{}{}",
+        i18n::t("1 to 8 players", "1 à 8 joueurs"),
+        bullet,
+        i18n::t("bots play themselves", "les bots jouent seuls"),
+        bullet,
+        i18n::t("save and resume", "sauvegarde et reprise")
+    );
+    centered(&join, cx, y + card_h + 116.0, 12.5, CREAM_DIM);
+
+    // Language and sound, in the top right corner.
+    let bar_x = sw - 190.0;
+    if !locked && button(Rect::new(bar_x, 20.0, 56.0, 30.0), i18n::code(), true, false) {
+        i18n::toggle();
+        app.setup.relabel_defaults();
+    }
+    if !locked
+        && sound_button(
+            Rect::new(bar_x + 64.0, 20.0, 34.0, 30.0),
+            Icon::Sfx,
+            crate::audio::sfx_on(),
+        )
+    {
+        crate::audio::toggle_sfx();
+    }
+    if !locked
+        && sound_button(
+            Rect::new(bar_x + 104.0, 20.0, 34.0, 30.0),
+            Icon::Music,
+            crate::audio::music_on(),
+        )
+    {
+        crate::audio::toggle_music();
+    }
+
+    centered(
+        &format!(
+            "Crazyopoly {} - {}",
+            env!("CARGO_PKG_VERSION"),
+            i18n::t("a Monopoly-like game in Rust", "un jeu inspiré de Monopoly, en Rust")
+        ),
+        cx,
+        sh - 24.0,
+        11.0,
+        DIM_GREEN,
+    );
+
+    if app.ui.rules_open {
+        draw_rules(&mut app.ui);
+    }
+}
+
+fn draw_rules(ui: &mut Ui) {
+    let r = modal_rect(980.0, 560.0);
+    let content = modal_shell(r, i18n::t("RULES OF THE GAME", "RÈGLES DU JEU"));
+    let col_w = (content.w - 26.0) * 0.5;
+    for (k, (en, fr)) in RULES.iter().enumerate() {
+        let col = k / 6;
+        let row = k % 6;
+        let x = content.x + col as f32 * (col_w + 26.0);
+        let y = content.y + 10.0 + row as f32 * 60.0;
+        draw_circle(x + 3.0, y - 4.0, 2.4, GOLD_DIM);
+        for (i, line) in wrap(i18n::t(en, fr), col_w - 14.0, 13.0)
+            .iter()
+            .take(4)
+            .enumerate()
+        {
+            txt(
+                line,
+                x + 12.0,
+                y + i as f32 * 17.0,
+                13.0,
+                if i == 0 { GOLD_SOFT } else { CREAM_DIM },
+            );
+        }
+    }
+    if button(
+        Rect::new(r.x + r.w * 0.5 - 80.0, r.y + r.h - 58.0, 160.0, 40.0),
+        i18n::t("CLOSE", "FERMER"),
+        true,
+        false,
+    ) {
+        ui.rules_open = false;
+    }
+}
+
+fn draw_vote(g: &mut Game, ui: &mut Ui) {
+    let r = modal_rect(700.0, 250.0 + 46.0 * g.players.len() as f32);
+    let content = modal_shell(r, i18n::t("END THE GAME?", "TERMINER LA PARTIE ?"));
+    let intro = wrap(
+        i18n::t(
+            "The whole table has to agree, and bots always do. The winner is whoever holds the most cash, deeds and buildings.",
+            "Toute la table doit être d'accord, et les bots le sont toujours. Le vainqueur est celui qui totalise le plus d'argent, de biens et de constructions.",
+        ),
+        content.w,
+        13.0,
+    );
+    for (i, line) in intro.iter().enumerate() {
+        txt(line, content.x, content.y + 10.0 + i as f32 * 18.0, 13.0, TEXT_DIM);
+    }
+
+    let mut y = content.y + 18.0 + intro.len() as f32 * 18.0 + 12.0;
+    let mut agreed_all = true;
+    for k in 0..g.players.len() {
+        let name = g.players[k].name.clone();
+        let ai = g.players[k].ai;
+        let color = g.players[k].color;
+        let worth = g.net_worth(k);
+        draw_circle(content.x + 7.0, y - 5.0, 5.0, color);
+        txt_bold(&name, content.x + 20.0, y, 14.0, CREAM);
+        txt(
+            &crate::tr!("worth {}", "patrimoine {}", money(worth)),
+            content.x + 20.0,
+            y + 16.0,
+            11.0,
+            MUTED,
+        );
+        let agreed = ai || ui.vote_agree.get(k).copied().unwrap_or(false);
+        if !agreed {
+            agreed_all = false;
+        }
+        if ai {
+            txt(
+                i18n::t("bot - agrees", "bot - d'accord"),
+                content.x + content.w - 132.0,
+                y,
+                12.5,
+                GOLD_SOFT,
+            );
+        } else {
+            let rect = Rect::new(content.x + content.w - 150.0, y - 19.0, 150.0, 32.0);
+            let label = if agreed {
+                i18n::t("AGREED", "D'ACCORD")
+            } else {
+                i18n::t("I AGREE", "JE SUIS D'ACCORD")
+            };
+            if toggle_button(rect, label, agreed) {
+                if ui.vote_agree.len() <= k {
+                    ui.vote_agree.resize(k + 1, false);
+                }
+                ui.vote_agree[k] = !agreed;
+            }
+        }
+        y += 44.0;
+    }
+
+    let by = r.y + r.h - 64.0;
+    if button(
+        Rect::new(r.x + 30.0, by, 280.0, 42.0),
+        i18n::t("END THE GAME", "TERMINER"),
+        agreed_all,
+        true,
+    ) {
+        g.finish_early();
+        ui.vote_open = false;
+    }
+    if button(
+        Rect::new(r.x + r.w - 310.0, by, 280.0, 42.0),
+        i18n::t("KEEP PLAYING", "CONTINUER"),
+        true,
+        false,
+    ) {
+        ui.vote_open = false;
+    }
+}
+
+fn draw_quit(ui: &mut Ui) -> bool {
+    let r = modal_rect(600.0, 280.0);
+    let content = modal_shell(r, i18n::t("BACK TO THE MENU", "RETOUR AU MENU"));
+    for (i, line) in wrap(
+        i18n::t(
+            "The game in progress will be lost unless you saved it first.",
+            "La partie en cours sera perdue si vous ne l'avez pas sauvegardée.",
+        ),
+        content.w,
+        13.5,
+    )
+    .iter()
+    .enumerate()
+    {
+        txt(
+            line,
+            content.x,
+            content.y + 14.0 + i as f32 * 20.0,
+            13.5,
+            CREAM_DIM,
+        );
+    }
+    let y = r.y + r.h - 64.0;
+    if button(
+        Rect::new(r.x + 32.0, y, 240.0, 40.0),
+        i18n::t("LEAVE", "QUITTER"),
+        true,
+        true,
+    ) {
+        return true;
+    }
+    if button(
+        Rect::new(r.x + r.w - 272.0, y, 240.0, 40.0),
+        i18n::t("KEEP PLAYING", "CONTINUER"),
+        true,
+        false,
+    ) {
+        ui.quit_confirm = false;
+    }
+    false
+}
