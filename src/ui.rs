@@ -3062,8 +3062,7 @@ fn draw_trade_editor(g: &mut Game) {
 fn draw_over(g: &mut Game) -> bool {
     let r = modal_rect(660.0, 640.0);
     let content = modal_shell(r, i18n::t("GAME OVER", "PARTIE TERMINÉE"));
-    let mut order: Vec<usize> = (0..g.players.len()).collect();
-    order.sort_by_key(|i| std::cmp::Reverse(g.net_worth(*i)));
+    let order = g.standings();
 
     if let Some(w) = g.winner {
         centered(i18n::t("WINNER", "VAINQUEUR"), r.x + r.w * 0.5, content.y + 16.0, 12.0, MUTED);
@@ -3092,16 +3091,13 @@ fn draw_over(g: &mut Game) -> bool {
             13.5,
             if g.players[*i].bankrupt { MUTED } else { TEXT },
         );
+        let right = if g.players[*i].bankrupt {
+            i18n::t("bankrupt", "en faillite").to_string()
+        } else {
+            money(g.net_worth(*i))
+        };
         text_r(
-            &format!(
-                "{}{}",
-                if g.players[*i].bankrupt {
-                    i18n::t("bankrupt - ", "faillite - ")
-                } else {
-                    ""
-                },
-                money(g.net_worth(*i))
-            ),
+            &right,
             row.x + row.w - 12.0,
             row.y + 24.0,
             12.0,

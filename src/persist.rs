@@ -78,6 +78,9 @@ struct SavedGame {
     chest: Vec<usize>,
     chest_idx: usize,
     log: Vec<String>,
+    /// Order in which players went bankrupt (missing in older saves).
+    #[serde(default)]
+    eliminated: Vec<usize>,
 }
 
 fn color_index(color: Color) -> usize {
@@ -178,6 +181,7 @@ impl SavedGame {
             houses_left: g.houses_left,
             hotels_left: g.hotels_left,
             chance,
+            eliminated: g.eliminated.clone(),
             chance_idx: g.chance.idx,
             chest,
             chest_idx: g.chest.idx,
@@ -264,7 +268,14 @@ impl SavedGame {
             });
         }
 
+        // `Game::new` deals fresh temperaments; a loaded game keeps its own.
+        let strategies: Vec<crate::ai::Strategy> =
+            players.iter().map(|p| p.strategy).collect();
         let mut game = Game::new(players);
+        for (player, strategy) in game.players.iter_mut().zip(strategies) {
+            player.strategy = strategy;
+        }
+        game.eliminated = self.eliminated.clone();
         game.props = props;
         game.turn = self.turn;
         game.phase = if self.managing {

@@ -64,13 +64,14 @@ every seat be a bot and watch it play itself:
   - **trading**: properties plus cash, offered to a human or a bot, which
     evaluates the deal; bots open trades **between themselves** too
   - **debt and bankruptcy**: sell buildings and mortgage lots to cover a debt,
-    or declare bankruptcy; assets pass to the creditor (or the bank) and the
-    last solvent player wins
+    or declare bankruptcy; the cash goes to the creditor, **every deed goes back
+    to the bank free of mortgage** - anyone landing on it can buy it again - and
+    the last solvent player wins
   - **ending a game early**: anyone can call the vote from **END THE GAME** in the
     pause menu, at any moment, even in the middle of a bot's turn. Every human has to agree (bots
-    always do); the ranking is by **net worth** -
-    cash plus the price of every deed plus its buildings - so the player who
-    would have won the long game wins here too
+    always do); the survivors are ranked by **net worth** - cash plus the price
+    of every deed plus its buildings - so the player who would have won the long
+    game wins here too
 - **French and English** interface, switchable at any time with the **FR / EN**
   button on the setup screen, in the corner of the main menu, and at the foot of
   the pause menu next to the debug switch. French is the default; street names
@@ -178,7 +179,7 @@ end-of-game vote, the final ranking and the token picker.
 
 | Ending a game by agreement | The final ranking |
 | --- | --- |
-| ![The vote to end the game](docs/vote.png) | ![Game over, ranked by net worth](docs/over.png) |
+| ![The vote to end the game](docs/vote.png) | ![Game over, ranked by who lasted longest](docs/over.png) |
 
 | Several saves, one picker | Hover any tile for its deed |
 | --- | --- |
@@ -328,7 +329,12 @@ src/
 
 - Free Parking collects nothing (as in the official rules; no house-rule pot).
 - Auction bids are limited to the bidder's cash on hand.
-- When a player goes bankrupt to the bank, their lots return to the bank rather
-  than being re-auctioned.
+- Whatever the creditor, a bankruptcy puts every deed of the player back on the
+  market: ownership, houses and mortgage are cleared, so the next player to land
+  on it may buy it at its price. Their cash and Get Out of Jail Free cards still
+  pass to the creditor.
+- The final screen ranks by survival: the last player standing is first, then
+  the others in the reverse order they went bankrupt - the one who lost first is
+  shown last. Survivors are ordered by net worth.
 - A hotel counts as five buildings for repair cards, and sells back for 2.5x the
   house price (half of the total invested).

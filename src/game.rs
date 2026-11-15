@@ -199,6 +199,8 @@ pub struct Game {
     /// Set once a bot has offered a trade during its current turn.
     pub bot_offer_done: bool,
     pub winner: Option<usize>,
+    /// Players in the order they went bankrupt: the last one lasted longest.
+    pub eliminated: Vec<usize>,
     /// Fast forward: every animation is resolved in the frame it starts.
     pub fast: bool,
 }
@@ -233,6 +235,7 @@ impl Game {
             trade_timer: 0.8,
             bot_offer_done: false,
             winner: None,
+            eliminated: Vec::new(),
             fast: false,
         };
         crate::ai::deal_strategies(&mut game);
@@ -1024,39 +1027,40 @@ impl Game {
         let cash = self.players[p].cash;
         let jail_cards = self.players[p].jail_cards;
 
-        match creditor {
-            Some(c) => {
-                self.players[c].cash += cash;
-                self.players[c].jail_cards += jail_cards;
-                for i in 0..40 {
-                    if self.props[i].owner == Some(p) {
-                        self.props[i].owner = Some(c);
-                    }
-                }
-                let cname = self.pname(c);
-                self.log(crate::tr!(
-                    "{} is bankrupt - everything passes to {}.",
-                    "{} est en faillite : tous ses biens reviennent à {}.",
-                    name, cname
-                ));
+        // Every deed goes back on the market, free of mortgage: anyone who
+        // lands on it from now on can buy it again.
+        let mut released = 0;
+        for i in 0..40 {
+            if self.props[i].owner == Some(p) {
+                self.props[i].owner = None;
+                self.props[i].mortgaged = false;
+                released += 1;
             }
-            None => {
-                for i in 0..40 {
-                    if self.props[i].owner == Some(p) {
-                        self.props[i].owner = None;
-                        self.props[i].mortgaged = false;
-                    }
-                }
-                self.log(crate::tr!(
-                    "{} is bankrupt - the bank takes everything.",
-                    "{} est en faillite : la banque saisit tout.",
-                    name
-                ));
-            }
+        }
+
+        if let Some(c) = creditor {
+            self.players[c].cash += cash;
+            self.players[c].jail_cards += jail_cards;
+            let cname = self.pname(c);
+            self.log(crate::tr!(
+                "{} is bankrupt - ${} passes to {}.",
+                "{} est en faillite : {} $ reviennent à {}.",
+                name, cash, cname
+            ));
+        } else {
+            self.log(crate::tr!("{} is bankrupt.", "{} est en faillite.", name));
+        }
+        if released > 0 {
+            self.log(crate::tr!(
+                "Their {} deed(s) return to the bank and can be bought again.",
+                "Ses {} titre(s) retournent à la banque et peuvent être rachetés.",
+                released
+            ));
         }
 
         self.players[p].cash = 0;
         self.players[p].jail_cards = 0;
+        self.eliminated.push(p);
         self.players[p].bankrupt = true;
         self.players[p].in_jail = false;
         self.debt = None;
@@ -1633,6 +1637,31 @@ impl Game {
         self.log(crate::tr!("-- {}'s turn --", "-- Tour de {} --", name));
     }
 
+    /// Final ranking: the last player standing first, then the others in the
+    /// reverse order they went bankrupt, so whoever fell first ranks last.
+    pub fn standings(&self) -> Vec<usize> {
+        let mut order: Vec<usize> = (0..self.players.len()).collect();
+        order.sort_by(|a, b| {
+            match (self.players[*a].bankrupt, self.players[*b].bankrupt) {
+                (false, false) => self.net_worth(*b).cmp(&self.net_worth(*a)),
+                (false, true) => std::cmp::Ordering::Less,
+                (true, false) => std::cmp::Ordering::Greater,
+                (true, true) => self.elimination_rank(*b).cmp(&self.elimination_rank(*a)),
+            }
+        });
+        order
+    }
+
+    /// How long a bankrupt player lasted: the higher, the later they fell.
+    /// Anyone still standing (or unknown, from an older save) counts as 0.
+    pub fn elimination_rank(&self, player: usize) -> usize {
+        self.eliminated
+            .iter()
+            .position(|p| *p == player)
+            .map(|i| i + 1)
+            .unwrap_or(0)
+    }
+
     pub fn declare_winner(&mut self) {
         let winner = self.players.iter().position(|p| !p.bankrupt);
         self.winner = winner;
@@ -1795,3 +1824,23 @@ fn sfx(kind: Sfx) {
 }
 
 use crate::audio::Sfx;
+
+#[cfg(test)]
+mod standings_tests {
+    use super::{Game, Player, PLAYER_COLORS};
+
+    #[test]
+    fn the_ranking_follows_the_order_players_fell() {
+        let players = (0..3)
+            .map(|i| Player::new(format!("P{}", i + 1), PLAYER_COLORS[i], true))
+            .collect();
+        let mut g = Game::new(players);
+        // Seen from the board, not from the table: the turn drives who folds.
+        g.turn = 2;
+        g.declare_bankrupt();
+        g.turn = 1;
+        g.declare_bankrupt();
+        assert_eq!(g.standings(), vec![0, 1, 2], "first out ranks last");
+        assert!(g.players[2].bankrupt && g.players[1].bankrupt);
+    }
+}
