@@ -167,6 +167,8 @@ pub struct Debt {
 }
 
 pub struct Game {
+    /// The table being played: names, prices, colours and order.
+    pub board: board::Board,
     pub spaces: Vec<Space>,
     pub props: Vec<Prop>,
     pub players: Vec<Player>,
@@ -206,9 +208,10 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn new(players: Vec<Player>) -> Self {
+    pub fn new(players: Vec<Player>, board: board::Board) -> Self {
         let mut game = Game {
-            spaces: board::spaces(),
+            spaces: board.spaces.clone(),
+            board,
             props: vec![Prop::default(); 40],
             players,
             turn: 0,
@@ -281,6 +284,23 @@ impl Game {
         (0..self.players.len())
             .filter(|&i| !self.players[i].bankrupt)
             .collect()
+    }
+
+    /// First space of this kind ahead of the player, wrapping around; the
+    /// board decides where the stations and the utilities are.
+    pub fn nearest_kind(&self, kind: Kind) -> usize {
+        let pos = self.players[self.turn].pos;
+        let mut fallback = None;
+        for step in 1..=self.spaces.len() {
+            let i = (pos + step) % self.spaces.len();
+            if self.spaces[i].kind == kind {
+                if i > pos {
+                    return i;
+                }
+                fallback.get_or_insert(i);
+            }
+        }
+        fallback.unwrap_or(0)
     }
 
     pub fn group_tiles(&self, group: Group) -> Vec<usize> {
@@ -541,7 +561,7 @@ impl Game {
     fn resolve_landing(&mut self, p: usize) {
         let pos = self.players[p].pos;
         let kind = self.spaces[pos].kind;
-        let name = self.spaces[pos].name;
+        let name = self.spaces[pos].name.clone();
         let pname = self.pname(p);
 
         match kind {
@@ -668,7 +688,7 @@ impl Game {
             i18n::t("COMMUNITY CHEST", "CAISSE DE COMMUNAUTÉ")
         };
         let who = self.pname(self.turn);
-        let text = card.sentence(&who);
+        let text = card.sentence(&who, &self.board);
         self.log(format!("{} - {}", deck_name, text));
         self.banner = Some((text, 5.0));
         sfx(Sfx::Card);
@@ -681,16 +701,11 @@ impl Game {
             Effect::AdvanceToGo => self.advance_to(0, LandingMod::Normal),
             Effect::AdvanceTo(tile) => self.advance_to(tile, LandingMod::Normal),
             Effect::NearestUtility => {
-                let pos = self.players[p].pos;
-                let target = *[12usize, 28].iter().find(|&&t| t > pos).unwrap_or(&12);
+                let target = self.nearest_kind(Kind::Utility);
                 self.advance_to(target, LandingMod::UtilityDice);
             }
             Effect::NearestRailroad => {
-                let pos = self.players[p].pos;
-                let target = *[5usize, 15, 25, 35]
-                    .iter()
-                    .find(|&&t| t > pos)
-                    .unwrap_or(&5);
+                let target = self.nearest_kind(Kind::Railroad);
                 self.advance_to(target, LandingMod::RailroadDouble);
             }
             Effect::Back(steps) => self.move_back(p, steps),
@@ -797,7 +812,7 @@ impl Game {
         self.props[pos].owner = Some(p);
         self.props[pos].mortgaged = false;
         sfx(Sfx::Buy);
-        let name = self.spaces[pos].name;
+        let name = self.spaces[pos].name.clone();
         self.log(crate::tr!(
             "{} buys {} for ${}.",
             "{} achète {} pour {} $.",
@@ -835,7 +850,7 @@ impl Game {
         });
         self.phase = Phase::Auction;
         self.ai_timer = 0.8;
-        let name = self.spaces[tile].name;
+        let name = self.spaces[tile].name.clone();
         self.log(crate::tr!(
             "{} goes up for auction.",
             "{} passe aux enchères.",
@@ -914,7 +929,7 @@ impl Game {
                 let price = a.bid;
                 self.players[winner].cash -= price;
                 self.props[a.tile].owner = Some(winner);
-                let (wname, tname) = (self.pname(winner), self.spaces[a.tile].name);
+                let (wname, tname) = (self.pname(winner), self.spaces[a.tile].name.clone());
                 self.log(crate::tr!(
                     "{} wins {} for ${}.",
                     "{} remporte {} pour {} $.",
@@ -924,7 +939,7 @@ impl Game {
                 ));
             }
         } else {
-            let name = self.spaces[a.tile].name;
+            let name = self.spaces[a.tile].name.clone();
             self.log(crate::tr!(
                 "No bids for {} - it stays with the bank.",
                 "Aucune offre pour {} : la propriété reste à la banque.",
@@ -1124,7 +1139,7 @@ impl Game {
         sfx(Sfx::Build);
         let h = self.props[tile].houses;
         self.props[tile].houses = if h == 4 { 5 } else { h + 1 };
-        let name = self.spaces[tile].name;
+        let name = self.spaces[tile].name.clone();
         let what = if self.props[tile].houses == 5 {
             i18n::t("a hotel", "un hôtel")
         } else {
@@ -1172,7 +1187,7 @@ impl Game {
         let refund = if h == 5 { cost * 5 / 2 } else { cost / 2 };
         self.props[tile].houses = if h == 5 { 4 } else { h - 1 };
         self.players[p].cash += refund;
-        let name = self.spaces[tile].name;
+        let name = self.spaces[tile].name.clone();
         self.log(crate::tr!(
             "{} sells a building on {} for ${}.",
             "{} revend une construction sur {} pour {} $.",
@@ -1194,7 +1209,7 @@ impl Game {
         let value = self.mortgage_value(tile);
         self.props[tile].mortgaged = true;
         self.players[p].cash += value;
-        let name = self.spaces[tile].name;
+        let name = self.spaces[tile].name.clone();
         self.log(crate::tr!(
             "{} mortgages {} for ${}.",
             "{} hypothèque {} pour {} $.",
@@ -1216,7 +1231,7 @@ impl Game {
         }
         self.players[p].cash -= cost;
         self.props[tile].mortgaged = false;
-        let name = self.spaces[tile].name;
+        let name = self.spaces[tile].name.clone();
         self.log(crate::tr!(
             "{} lifts the mortgage on {} for ${}.",
             "{} lève l'hypothèque sur {} pour {} $.",
@@ -1476,17 +1491,7 @@ impl Game {
         if self.players[p].cash < 300 {
             return false;
         }
-        let groups = [
-            Group::Brown,
-            Group::LightBlue,
-            Group::Pink,
-            Group::Orange,
-            Group::Red,
-            Group::Yellow,
-            Group::Green,
-            Group::DarkBlue,
-        ];
-        for group in groups {
+        for group in self.board.street_groups() {
             let tiles = self.group_tiles(group);
             if tiles.is_empty() || self.group_owned(p, group) + 1 != tiles.len() {
                 continue;
@@ -1501,7 +1506,7 @@ impl Game {
                 continue;
             }
             let price = self.spaces[target].price as i64;
-            let name = self.spaces[target].name;
+            let name = self.spaces[target].name.clone();
             let bot = self.pname(p);
             if self.players[owner].ai {
                 // Two bots settle on the spot: raise the offer step by step, but
@@ -1834,7 +1839,7 @@ mod standings_tests {
         let players = (0..3)
             .map(|i| Player::new(format!("P{}", i + 1), PLAYER_COLORS[i], true))
             .collect();
-        let mut g = Game::new(players);
+        let mut g = Game::new(players, crate::board::default_board());
         // Seen from the board, not from the table: the turn drives who folds.
         g.turn = 2;
         g.declare_bankrupt();

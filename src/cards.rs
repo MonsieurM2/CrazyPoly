@@ -38,8 +38,41 @@ impl Card {
     }
 
     /// The printed sentence, naming the player who drew the card.
-    pub fn sentence(&self, who: &str) -> String {
-        self.text().replacen("{}", who, 1)
+    ///
+    /// "Advance to" cards take the name of the space from the board being
+    /// played, so a French or imported board is named with its own streets.
+    pub fn sentence(&self, who: &str, board: &crate::board::Board) -> String {
+        match self.effect {
+            Effect::AdvanceToGo => crate::tr!(
+                "{} advances to {} and collects $200.",
+                "{} avance jusqu'à la case {} et reçoit 200 $.",
+                who,
+                board.spaces[0].name
+            ),
+            Effect::AdvanceTo(tile) => {
+                let name = board
+                    .spaces
+                    .get(tile)
+                    .map(|s| s.name.as_str())
+                    .unwrap_or("");
+                if self.en.contains("if GO is passed") {
+                    crate::tr!(
+                        "{} advances to {}, collecting $200 if GO is passed.",
+                        "{} avance jusqu'à la case {}, en recevant 200 $ si la case DÉPART est passée.",
+                        who,
+                        name
+                    )
+                } else {
+                    crate::tr!(
+                        "{} advances to {}.",
+                        "{} avance jusqu'à la case {}.",
+                        who,
+                        name
+                    )
+                }
+            }
+            _ => self.text().replacen("{}", who, 1),
+        }
     }
 }
 
@@ -287,4 +320,23 @@ pub fn chance_deck() -> Deck {
 
 pub fn chest_deck() -> Deck {
     Deck::new("COMMUNITY CHEST", chest_cards())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn advance_cards_use_the_board_names() {
+        let french = crate::board::builtin("fr").unwrap();
+        let english = crate::board::builtin("en").unwrap();
+        let card = chance_cards()
+            .into_iter()
+            .find(|c| matches!(c.effect, Effect::AdvanceTo(24)))
+            .unwrap();
+        let fr = card.sentence("Ana", &french);
+        let en = card.sentence("Ana", &english);
+        assert!(fr.contains("Avenue Henri-Martin"), "{}", fr);
+        assert!(en.contains("Illinois Avenue"), "{}", en);
+    }
 }

@@ -25,6 +25,13 @@ every seat be a bot and watch it play itself:
 - **1 to 8 players** on one shared screen (hot-seat), with an **AI bot** toggle for
   every seat: solo against bots, a mixed table, or a game with **no human at all**
   (set every seat to BOT and watch it play itself).
+- A **configurable board**: the table is one JSON file - names, prices, rents,
+  colours and the order of the four sides - so the two boards shipped with the
+  game (the classic English one and a French one) can be swapped for anyone's
+  own or freely edited. **BOARD > CHANGE** lists them, imports a file with the
+  system's file picker, and deletes the imported ones; the two included boards
+  stay. Switching the interface language swaps the shipped board for the one in
+  that language, and an imported board keeps its own names.
 - The complete **40-space official board**: all streets, colour groups, prices,
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
@@ -145,10 +152,15 @@ every seat be a bot and watch it play itself:
 
 Every capture below is taken in English, cropped to the window itself.
 
-The setup screen - 2 to 8 seats, each one HUMAN or BOT, a token design per seat
-and the FR / EN switch:
+The setup screen - 2 to 8 seats, each one HUMAN or BOT, a token design per seat,
+the board to play on and the FR / EN switch:
 
 ![Setup screen](docs/setup.png)
+
+The board list: the two included boards, the imported ones under them with a
+cross to delete them, and the import button:
+
+![The board picker](docs/boards.png)
 
 A throw in progress: the cubes tumble, bounce and land, and the upper face of
 each one is the result. Once they have stopped they hop back to their home spots,
@@ -292,12 +304,62 @@ takes the table.
 
 ## Language
 
-French is the default. Press the **FR / EN** button under the player list, or the
-one on the setup screen, to switch instantly - labels, tooltips, cards,
-buttons and every log message follow the active language. All strings live in
-two places: `src/i18n.rs` (`t("English", "Français")` and the `tr!` macro for
-formatted messages) and the bilingual card texts in `src/cards.rs`, so adding a
-language only touches those two modules.
+French is the default. Press the **FR / EN** button in the corner of the menu or
+of the setup screen, to switch instantly - labels, tooltips, cards, buttons and
+every log message follow the active language. All strings live in two places:
+`src/i18n.rs` (`t("English", "Français")` and the `tr!` macro for formatted
+messages) and the bilingual card texts in `src/cards.rs`, so adding a language
+only touches those two modules.
+
+The **board** follows that switch: a shipped board gives way to the shipped board
+of the new language (the classic English table, or the French one with its own
+streets, stations and companies), so the two never contradict each other. A board
+the player picked by hand stays until the next language change, and an **imported
+board keeps its own names** whatever the interface language is.
+
+## Boards
+
+A board is a single JSON file describing all 40 spaces in playing order, starting
+at GO and running counter-clockwise as seen from the players' side: bottom edge
+(right to left), left edge (bottom to top), top edge (left to right), right edge
+(top to bottom).
+
+```json
+{
+  "name": "My board",
+  "groups": [
+    { "name": "Brown", "color": "#954936" }
+  ],
+  "spaces": [
+    { "kind": "go", "name": "GO" },
+    { "kind": "street", "name": "Rue Lecourbe", "group": 0, "price": 60,
+      "rent": [4, 20, 60, 180, 320, 450], "house": 50 }
+  ]
+}
+```
+
+- `kind` is one of `go`, `street`, `chest`, `tax`, `railroad`, `chance`, `jail`,
+  `utility`, `free_parking`, `go_to_jail`, and the corners are fixed: space 0 is
+  `go`, 10 `jail`, 20 `free_parking`, 30 `go_to_jail`.
+- A board holds exactly **40 spaces**. Anything else - a missing name, a colour
+  that is not `#rrggbb`, a street pointing at a group that does not exist - is
+  refused, with the reason, before the board is copied anywhere.
+- `group` is an index into `groups`. The group's colour is the band drawn on its
+  tiles and on the title deed, and a player holds the set when every street with
+  that index belongs to them.
+- `rent` holds six values: base rent, then one to four houses, then a hotel.
+  `house` is the price of one building, `tax` what a tax space costs, and
+  `price` what a station or a utility costs (their rent follows how many of them
+  are owned, as usual).
+- The order, the names, the prices and the rents are entirely yours. Chance and
+  Community Chest keep the printed cards, and the "advance to" cards name the
+  space at their index on the board being played, so a French or imported board
+  is never sent to an English street.
+- Ships with `assets/boards/classic-en.json` and `classic-fr.json`, compiled into
+  the executable. **IMPORT A FILE** copies any other board into
+  `%APPDATA%\\Crazypoly\\boards` (`~/.local/share/Crazyopoly/boards` on Linux),
+  where it stays listed until its cross deletes it; the two included boards can
+  never be overwritten or removed.
 
 ## Project layout
 
@@ -307,10 +369,13 @@ assets/
   Lato-Regular.ttf, Lato-Bold.ttf   bundled UI fonts (SIL OFL, see OFL.txt)
   PlayfairDisplay.ttf               titles (SIL OFL, see OFL-Playfair.txt)
   audio/                            music + effects (WAV, generated, see Sound)
+  boards/                          the included tables, compiled into the game
+    classic-en.json, classic-fr.json
 src/
   audio.rs   music and effects: embedded WAVs, one-shot playback, the two toggles
   main.rs    window setup, app state, frame loop
-  board.rs   static board data (names, groups, prices, rent tables)
+  board.rs   board data: the file format, its checks, the two included tables
+  boards.rs  boards on disk: list, import, delete, follow the interface language
   cards.rs   bilingual Chance / Community Chest decks
   game.rs    rules engine and phase state machine
   i18n.rs    active language, `t()` and the `tr!` macro

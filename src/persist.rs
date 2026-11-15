@@ -81,6 +81,10 @@ struct SavedGame {
     /// Order in which players went bankrupt (missing in older saves).
     #[serde(default)]
     eliminated: Vec<usize>,
+    /// The table this game is played on (missing in older saves: the board
+    /// then falls back to the one matching the interface language).
+    #[serde(default)]
+    board: Option<crate::board::BoardFile>,
 }
 
 fn color_index(color: Color) -> usize {
@@ -182,6 +186,7 @@ impl SavedGame {
             hotels_left: g.hotels_left,
             chance,
             eliminated: g.eliminated.clone(),
+            board: Some(g.board.to_file()),
             chance_idx: g.chance.idx,
             chest,
             chest_idx: g.chest.idx,
@@ -271,7 +276,11 @@ impl SavedGame {
         // `Game::new` deals fresh temperaments; a loaded game keeps its own.
         let strategies: Vec<crate::ai::Strategy> =
             players.iter().map(|p| p.strategy).collect();
-        let mut game = Game::new(players);
+        let board = self
+            .board
+            .and_then(|file| crate::board::Board::from_file(file).ok())
+            .unwrap_or_else(crate::board::default_board);
+        let mut game = Game::new(players, board);
         for (player, strategy) in game.players.iter_mut().zip(strategies) {
             player.strategy = strategy;
         }

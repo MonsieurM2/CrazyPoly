@@ -8,7 +8,7 @@ use std::cell::RefCell;
 
 use macroquad::prelude::*;
 
-use crate::board::{Group, Kind, Space};
+use crate::board::{Kind, Space};
 use crate::game::{Game, Phase, TradeState, MAX_HOUSES};
 use crate::i18n;
 use crate::tokens;
@@ -527,21 +527,6 @@ fn modal_shell(r: Rect, title: &str) -> Rect {
     Rect::new(r.x + 22.0, r.y + 66.0, r.w - 44.0, r.h - 86.0)
 }
 
-fn group_title(group: Group) -> &'static str {
-    match group {
-        Group::Brown => i18n::t("Brown", "Marron"),
-        Group::LightBlue => i18n::t("Light blue", "Bleu clair"),
-        Group::Pink => i18n::t("Pink", "Rose"),
-        Group::Orange => i18n::t("Orange", "Orange"),
-        Group::Red => i18n::t("Red", "Rouge"),
-        Group::Yellow => i18n::t("Yellow", "Jaune"),
-        Group::Green => i18n::t("Green", "Vert"),
-        Group::DarkBlue => i18n::t("Dark blue", "Bleu foncé"),
-        Group::Railroad => i18n::t("Railroad", "Chemin de fer"),
-        Group::Utility => i18n::t("Utility", "Service"),
-        Group::Special => "",
-    }
-}
 
 fn list_names(g: &Game, tiles: &[usize]) -> String {
     if tiles.is_empty() {
@@ -549,8 +534,8 @@ fn list_names(g: &Game, tiles: &[usize]) -> String {
     }
     tiles
         .iter()
-        .map(|t| g.spaces[*t].name)
-        .collect::<Vec<&str>>()
+        .map(|t| g.spaces[*t].name.clone())
+        .collect::<Vec<String>>()
         .join(", ")
 }
 
@@ -614,6 +599,15 @@ pub struct Setup {
     pub editing: Option<usize>,
     /// Seat whose token is being chosen, if the picker is open.
     pub token_slot: Option<usize>,
+    /// Board the next game is played on, and the file it came from.
+    pub board_id: String,
+    pub board: crate::board::Board,
+    /// True while the board list covers the screen.
+    pub board_picker: bool,
+    /// Last message about boards: an import error, a deletion, ...
+    pub board_note: String,
+    /// Interface language the board was last matched against.
+    pub last_language: String,
     pub error: String,
 }
 
@@ -627,11 +621,17 @@ impl Default for Setup {
                 token: i % tokens::COUNT,
             });
         }
+        let board = crate::board::default_board();
         Setup {
             count: 2,
             slots,
             editing: None,
             token_slot: None,
+            board_id: crate::boards::id_of(&board),
+            board,
+            board_picker: false,
+            board_note: String::new(),
+            last_language: i18n::code().to_string(),
             error: String::new(),
         }
     }
@@ -645,6 +645,32 @@ impl Setup {
             if slot.name == format!("Player {}", n) || slot.name == format!("Joueur {}", n) {
                 slot.name = format!("{} {}", i18n::t("Player", "Joueur"), n);
             }
+        }
+    }
+
+    /// When the interface language changes, a shipped board gives way to the
+    /// shipped board of the new language. An imported board, or a board the
+    /// player picked by hand, is left alone until the next language change.
+    pub fn follow_language(&mut self) {
+        let now = i18n::code().to_string();
+        if now == self.last_language {
+            return;
+        }
+        self.last_language = now;
+        if let Some(board) = crate::boards::following_language(&self.board) {
+            self.board_id = crate::boards::id_of(&board);
+            self.board = board;
+        }
+    }
+
+    /// Loads the board with this id and makes it the one to play on.
+    pub fn select_board(&mut self, id: &str) {
+        match crate::boards::load(id) {
+            Ok(board) => {
+                self.board_id = id.to_string();
+                self.board = board;
+            }
+            Err(e) => self.board_note = e,
         }
     }
 
@@ -693,7 +719,158 @@ pub fn frame(app: &mut App) {
 
 // ------------------------------------------------------------ setup screen
 
+/// The board list: pick the table to play on, import a file, delete an
+/// imported board. The two boards shipped with the game stay put.
+fn draw_board_picker(app: &mut App) {
+    let sw = screen_width();
+    let sh = screen_height();
+    draw_rectangle(0.0, 0.0, sw, sh, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.55 });
+    let entries = crate::boards::list();
+    let shown = entries.len().min(7);
+    let w = 580.0_f32.min(sw - 40.0);
+    let h = 128.0 + shown as f32 * 46.0 + 86.0;
+    let x = (sw - w) * 0.5;
+    let y = (sh - h) * 0.5;
+    round_card(x, y, w, h, 14.0, PANEL_BG, CARD_EDGE);
+    serif_center(i18n::t("BOARD", "PLATEAU"), x + w * 0.5, y + 38.0, 26.0, GOLD_SOFT);
+    draw_line(x + 24.0, y + 56.0, x + w - 24.0, y + 56.0, 1.0, GOLD_DIM);
+    let (mx, my) = mouse_position();
+    let clicked = is_mouse_button_pressed(MouseButton::Left);
+    let mut closing = false;
+
+    for (i, entry) in entries.iter().take(shown).enumerate() {
+        let rr = Rect::new(x + 22.0, y + 70.0 + i as f32 * 46.0, w - 44.0, 40.0);
+        let selected = entry.id == app.setup.board_id;
+        let hover = inr(rr, mx, my);
+        round_rect(
+            rr.x,
+            rr.y,
+            rr.w,
+            rr.h,
+            9.0,
+            if selected {
+                SELECT
+            } else if hover {
+                BTN_HOVER
+            } else {
+                ROW_BG
+            },
+        );
+        if selected {
+            round_outline(rr.x, rr.y, rr.w, rr.h, 9.0, 1.5, GOLD);
+        }
+        let del = Rect::new(rr.x + rr.w - 40.0, rr.y + 7.0, 30.0, 26.0);
+        let del_hover = !entry.builtin && inr(del, mx, my);
+        if del_hover {
+            round_rect(del.x, del.y, del.w, del.h, 6.0, ACCENT);
+        }
+        let name_size = 15.0;
+        txt_bold(
+            &truncate(&entry.name, rr.w - (if entry.builtin { 130.0 } else { 176.0 }), name_size),
+            rr.x + 14.0,
+            rr.y + 21.0,
+            name_size,
+            if selected { GOLD_SOFT } else { TEXT },
+        );
+        text_r(
+            &entry.tag(),
+            rr.x + rr.w - (if entry.builtin { 16.0 } else { 52.0 }),
+            rr.y + 21.0,
+            10.5,
+            MUTED,
+        );
+        if !entry.builtin {
+            centered_bold("×", del.x + del.w * 0.5, del.y + 18.0, 17.0, if del_hover { BG_DEEP } else { MUTED });
+            if del_hover && clicked {
+                match crate::boards::delete(&entry.id) {
+                    Ok(()) => {
+                        app.setup.board_note =
+                            i18n::t("Board deleted.", "Plateau supprimé.").to_string();
+                        if selected {
+                            app.setup.board = crate::board::default_board();
+                            app.setup.board_id = crate::boards::id_of(&app.setup.board);
+                        }
+                    }
+                    Err(e) => app.setup.board_note = e,
+                }
+                continue;
+            }
+        }
+        if clicked && hover && !del_hover {
+            app.setup.select_board(&entry.id);
+            closing = true;
+        }
+    }
+    if entries.len() > shown {
+        txt(
+            &format!("+{}", entries.len() - shown),
+            x + 26.0,
+            y + 70.0 + shown as f32 * 46.0 + 16.0,
+            11.0,
+            MUTED,
+        );
+    }
+
+    let foot = y + h - 78.0;
+    if button(
+        Rect::new(x + 22.0, foot, 216.0, 38.0),
+        i18n::t("IMPORT A FILE", "IMPORTER UN FICHIER"),
+        true,
+        false,
+    ) {
+        let picked = rfd::FileDialog::new()
+            .add_filter(i18n::t("Board", "Plateau"), &["json"])
+            .set_title(i18n::t("Choose a board file", "Choisir un fichier de plateau"))
+            .pick_file();
+        if let Some(path) = picked {
+            match crate::boards::import(&path) {
+                Ok(entry) => {
+                    app.setup.select_board(&entry.id);
+                    app.setup.board_note = crate::tr!(
+                        "Imported {}.",
+                        "{} importé.",
+                        entry.name
+                    );
+                    closing = true;
+                }
+                Err(e) => app.setup.board_note = e,
+            }
+        }
+    }
+    if button(
+        Rect::new(x + w - 142.0, foot, 120.0, 38.0),
+        i18n::t("CLOSE", "FERMER"),
+        true,
+        false,
+    ) {
+        closing = true;
+    }
+
+    let info = if app.setup.board_note.is_empty() {
+        format!(
+            "{} {}",
+            i18n::t("Imported boards are kept in", "Les plateaux importés sont conservés dans"),
+            crate::boards::dir().display()
+        )
+    } else {
+        app.setup.board_note.clone()
+    };
+    let warn = !app.setup.board_note.is_empty();
+    centered(
+        &truncate(&info, w - 40.0, 10.0),
+        x + w * 0.5,
+        y + h - 24.0,
+        10.0,
+        if warn { WARN } else { MUTED },
+    );
+
+    if closing {
+        app.setup.board_picker = false;
+    }
+}
+
 fn draw_setup(app: &mut App) {
+    app.setup.follow_language();
     felt_background();
     let sw = screen_width();
     let sh = screen_height();
@@ -702,7 +879,7 @@ fn draw_setup(app: &mut App) {
     let x = (sw - w) * 0.5;
     let y = (sh - h) * 0.5;
     // While the token picker is open it owns every click.
-    let picker_open = app.setup.token_slot.is_some() || app.ui.load_open;
+    let picker_open = app.setup.token_slot.is_some() || app.ui.load_open || app.setup.board_picker;
 
     round_card(x, y, w, h, 16.0, PANEL_BG, CARD_EDGE);
     serif_center("Crazyopoly", x + w * 0.5, y + 46.0, 50.0, GOLD_SOFT);
@@ -740,6 +917,28 @@ fn draw_setup(app: &mut App) {
         )
     {
         crate::audio::toggle_sfx();
+    }
+
+    // board selector
+    let by = y + 112.0;
+    txt_bold(i18n::t("BOARD", "PLATEAU"), x + 32.0, by + 5.0, 13.0, MUTED);
+    txt(
+        &truncate(&app.setup.board.name, w - 340.0, 14.0),
+        x + 110.0,
+        by + 6.0,
+        14.0,
+        GOLD_SOFT,
+    );
+    if !picker_open
+        && button(
+            Rect::new(x + w - 132.0, by - 15.0, 100.0, 30.0),
+            i18n::t("CHANGE", "CHANGER"),
+            true,
+            false,
+        )
+    {
+        app.setup.board_note.clear();
+        app.setup.board_picker = true;
     }
 
     // player count
@@ -951,7 +1150,7 @@ fn draw_setup(app: &mut App) {
         )
     {
         app.setup.error.clear();
-        app.game = Some(Game::new(app.setup.build_players()));
+        app.game = Some(Game::new(app.setup.build_players(), app.setup.board.clone()));
         app.ui = Ui::new();
         app.screen = Screen::Play;
     }
@@ -994,6 +1193,9 @@ fn draw_setup(app: &mut App) {
     );
     if app.ui.load_open {
         draw_load(app);
+    }
+    if app.setup.board_picker {
+        draw_board_picker(app);
     }
     if let Some(slot) = app.setup.token_slot {
         // Ignore the click that opened the picker: it belongs to the setup row.
@@ -1580,12 +1782,13 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
     } else {
         if space.has_band() {
             let band = band_rect(&r, side);
-            draw_rectangle(band.x, band.y, band.w, band.h, space.group.color());
+            draw_rectangle(band.x, band.y, band.w, band.h, g.board.color(space.group));
             draw_buildings(band, side, g.props[i].houses);
         } else if space.kind == Kind::Railroad {
             draw_rail_icon(&r, side);
         } else if space.kind == Kind::Utility {
-            if space.name.starts_with("Water") {
+            let lowered = space.name.to_lowercase();
+            if lowered.contains("water") || lowered.contains("eau") {
                 draw_water_icon(&r, side);
             } else {
                 draw_power_icon(&r, side);
@@ -1597,7 +1800,7 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
         }
 
         let tr = text_rect(&r, side);
-        let (lines, size) = fit_wrap(space.name, tr.w, 3, r.w * 0.145);
+        let (lines, size) = fit_wrap(&space.name, tr.w, 3, r.w * 0.145);
         let lh = size * 1.10;
         let total = lines.len() as f32 * lh;
         let start = tr.y + (tr.h - total) * 0.5;
@@ -2074,7 +2277,7 @@ fn draw_player_card(g: &Game, index: usize, r: Rect, debug: bool) {
     let chips_y = r.y + r.h - 14.0;
     let mut x = text_x;
     for tile in owned.iter().take(6) {
-        draw_rectangle(x, chips_y - 4.5, 9.0, 9.0, g.spaces[*tile].group.color());
+        draw_rectangle(x, chips_y - 4.5, 9.0, 9.0, g.board.color(g.spaces[*tile].group));
         x += 11.0;
     }
     if !owned.is_empty() {
@@ -2085,19 +2288,12 @@ fn draw_player_card(g: &Game, index: usize, r: Rect, debug: bool) {
     if houses > 0 {
         parts.push(crate::tr!("{} houses", "{} maisons", houses));
     }
-    let complete = [
-        Group::Brown,
-        Group::LightBlue,
-        Group::Pink,
-        Group::Orange,
-        Group::Red,
-        Group::Yellow,
-        Group::Green,
-        Group::DarkBlue,
-    ]
-    .iter()
-    .filter(|group| g.has_monopoly(index, **group))
-    .count();
+    let complete = g
+        .board
+        .street_groups()
+        .into_iter()
+        .filter(|group| g.has_monopoly(index, *group))
+        .count();
     if complete > 0 {
         parts.push(i18n::t("complete set", "série complète").to_string());
     }
@@ -2328,7 +2524,7 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
     draw_rectangle_lines(x, y, w, h, 1.5, INK_LINE);
 
     let head_h = h * 0.30;
-    draw_rectangle(x, y, w, head_h, space.group.color());
+    draw_rectangle(x, y, w, head_h, g.board.color(space.group));
     draw_rectangle_lines(x, y, w, head_h, 1.2, INK_LINE);
     // Dark bands (railroads, utilities) need white lettering.
     let head_ink = if space.group.street() { INK } else { WHITE };
@@ -2341,10 +2537,10 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
         head_ink,
     );
     let mut name_size = w * 0.115;
-    while serif_w(space.name, name_size) > w - 20.0 && name_size > 8.0 {
+    while serif_w(&space.name, name_size) > w - 20.0 && name_size > 8.0 {
         name_size -= 0.5;
     }
-    serif_center(space.name, x + w * 0.5, y + head_h * 0.66, name_size, head_ink);
+    serif_center(&space.name, x + w * 0.5, y + head_h * 0.66, name_size, head_ink);
 
     let mut rows: Vec<(String, String)> = Vec::new();
     if space.group.street() {
@@ -2467,7 +2663,7 @@ fn draw_auction(g: &mut Game) {
     let high = auction.high;
     let turn = auction.turn;
     let active = auction.active.clone();
-    let name = g.spaces[tile].name;
+    let name = g.spaces[tile].name.clone();
     let price = g.spaces[tile].price;
     let bidder_ai = g.players[turn].ai;
     let bidder_name = g.players[turn].name.clone();
@@ -2481,7 +2677,7 @@ fn draw_auction(g: &mut Game) {
 
     let r = modal_rect(600.0, 550.0);
     let content = modal_shell(r, i18n::t("AUCTION", "ENCHÈRES"));
-    centered_bold(name, r.x + r.w * 0.5, content.y + 20.0, 21.0, TEXT);
+    centered_bold(&name, r.x + r.w * 0.5, content.y + 20.0, 21.0, TEXT);
     centered(
         &format!("{} {}", i18n::t("List price", "Prix affiché"), money(price as i64)),
         r.x + r.w * 0.5,
@@ -2729,16 +2925,16 @@ fn draw_assets(g: &mut Game, ui: &mut Ui, _lay: &Layout) {
             ui.asset_card = Some(*tile);
         }
         let space = &g.spaces[*tile];
-        let gcolor = space.group.color();
-        let gtitle = group_title(space.group);
+        let gcolor = g.board.color(space.group);
+        let gtitle = g.board.group_title(space.group);
         let is_street = space.group.street();
-        let tile_name = space.name;
+        let tile_name = space.name.clone();
         let houses = g.props[*tile].houses;
         let mortgaged = g.props[*tile].mortgaged;
 
         draw_rectangle(rr.x, rr.y, rr.w, rr.h, ROW_BG);
         draw_rectangle(rr.x, rr.y, 6.0, rr.h, gcolor);
-        txt_bold(&truncate(tile_name, rr.w - 112.0, 12.0), rr.x + 14.0, rr.y + 18.0, 12.0, TEXT);
+        txt_bold(&truncate(&tile_name, rr.w - 112.0, 12.0), rr.x + 14.0, rr.y + 18.0, 12.0, TEXT);
         let status = if mortgaged {
             i18n::t("MORTGAGED", "HYPOTHÉQUÉ").to_string()
         } else if houses == MAX_HOUSES {
@@ -2958,8 +3154,8 @@ fn draw_trade_editor(g: &mut Game) {
         let space = &g.spaces[*tile];
         let has_houses = g.props[*tile].houses > 0;
         draw_rectangle(rr.x, rr.y, rr.w, rr.h, if selected { SELECT } else { ROW_BG });
-        draw_rectangle(rr.x, rr.y, 6.0, rr.h, space.group.color());
-        txt(&truncate(space.name, col_w - 120.0, 12.0), rr.x + 14.0, rr.y + 16.0, 12.0, if has_houses { MUTED } else { TEXT });
+        draw_rectangle(rr.x, rr.y, 6.0, rr.h, g.board.color(space.group));
+        txt(&truncate(&space.name, col_w - 120.0, 12.0), rr.x + 14.0, rr.y + 16.0, 12.0, if has_houses { MUTED } else { TEXT });
         text_r(&format!("{} $", space.price), rr.x + col_w - 10.0, rr.y + 16.0, 11.0, MUTED);
         if draft && inr(rr, mouse_position().0, mouse_position().1) && is_mouse_button_pressed(MouseButton::Left) {
             g.trade_toggle(*tile);
@@ -2978,8 +3174,8 @@ fn draw_trade_editor(g: &mut Game) {
         let space = &g.spaces[*tile];
         let has_houses = g.props[*tile].houses > 0;
         draw_rectangle(rr.x, rr.y, rr.w, rr.h, if selected { SELECT } else { ROW_BG });
-        draw_rectangle(rr.x, rr.y, 6.0, rr.h, space.group.color());
-        txt(&truncate(space.name, col_w - 120.0, 12.0), rr.x + 14.0, rr.y + 16.0, 12.0, if has_houses { MUTED } else { TEXT });
+        draw_rectangle(rr.x, rr.y, 6.0, rr.h, g.board.color(space.group));
+        txt(&truncate(&space.name, col_w - 120.0, 12.0), rr.x + 14.0, rr.y + 16.0, 12.0, if has_houses { MUTED } else { TEXT });
         text_r(&format!("{} $", space.price), rr.x + col_w - 10.0, rr.y + 16.0, 11.0, MUTED);
         if draft && inr(rr, mouse_position().0, mouse_position().1) && is_mouse_button_pressed(MouseButton::Left) {
             g.trade_toggle(*tile);

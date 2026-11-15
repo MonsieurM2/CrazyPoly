@@ -378,7 +378,7 @@ mod tests {
         let players = (0..4)
             .map(|i| Player::new(format!("Bot {}", i + 1), PLAYER_COLORS[i], true))
             .collect();
-        let mut g = Game::new(players);
+        let mut g = Game::new(players, crate::board::default_board());
         g.fast = true;
         for (i, player) in g.players.iter_mut().enumerate() {
             player.strategy = Strategy::ALL[i];
