@@ -8,7 +8,7 @@ for body text and [Playfair Display](https://fonts.google.com/specimen/Playfair+
 for the titles (both SIL Open Font License), plus the soundtrack and the sound
 effects, all synthesised from scratch for this game (see **Sound** below).
 
-Base repository: <https://github.com/crazypoly/crazypoly>
+Base repository: <https://github.com/MonsieurM2/CrazyPoly>
 
 A property is offered: its title deed floats over the board, the decision sits in
 the right-hand column, and the log follows every move in the players' colours:

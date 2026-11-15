@@ -1,7 +1,7 @@
 // Crazyopoly - a complete, self-contained recreation of the classic Monopoly
 // board game, written in Rust with the macroquad 2D framework.
 //
-// Base repository: https://github.com/crazypoly/crazypoly
+// Base repository: https://github.com/MonsieurM2/CrazyPoly
 //
 // The project is split into small focused modules:
 //   board.rs  - the 40 official spaces, colour groups, prices and rents
