@@ -28,7 +28,11 @@ every seat be a bot and watch it play itself:
 - The complete **40-space official board**: all streets, colour groups, prices,
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
-  plus the dice at the centre of the board.
+  plus the dice at the centre of the board. Every special space is drawn with
+  its own pictogram: a locomotive on its rails for the stations, a tap and a
+  drop for Water Works, a bolt for Electric Company, a card for Chance, a banded
+  chest for Community Chest, a barred cell for the jail, a park with its tree
+  and its bench for Free Parking, and a little red car for GO.
 - An **animated main menu**: gold dust drifts up over the felt, the rings behind
   the card breathe, the title carries a pulsing halo, the eight tokens float in a
   row and a sheen runs across **NEW GAME**. It offers **NEW GAME**, **CONTINUE**
@@ -93,10 +97,12 @@ every seat be a bot and watch it play itself:
   effects and a note for the music - turn either channel off at any time, on the
   setup screen and in the left column of the board.
 - **Every space shows its own deed**: hover any tile and its title deed opens
-  under the cursor - the rent table for a street, the four rates for a railroad,
-  the 4x / 10x dice multipliers for a utility. The owner - a colour dot and a
-  name, or *Unowned* in grey - sits in a cream plate at the foot of the card,
-  drawn in the same cream-and-gold style as the rest of it.
+  under the cursor (it takes over from the card of a space you have just landed
+  on, so the two never sit on top of each other) - the rent table for a street,
+  the four rates for a railroad, the 4x / 10x dice multipliers for a utility.
+  The owner - a colour dot and a name, or *Unowned* in grey - sits in a cream
+  plate at the foot of the card, drawn in the same cream-and-gold style as the
+  rest of it.
 - **Your deeds on demand**: in **MES BIENS / ASSETS**, click a lot to read its
   card without leaving the window, even mid-turn.
 - **Fast forward**: the `>>>` button at the bottom of the left column resolves

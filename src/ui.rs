@@ -1218,10 +1218,13 @@ fn draw_play(app: &mut App) {
     let input = modal == Modal::None;
 
     felt_background();
+    // A tile under the cursor shows its own deed; the card of the space on
+    // offer would only cover it.
+    let over_tile = input && (0..40).any(|i| inr(lay.geo.rect(i), mx, my));
     draw_board(g, &lay, mx, my, input);
     draw_left_column(g, ui, &lay);
     draw_right_column(g, ui, &lay, input);
-    if buying(g) {
+    if buying(g) && !over_tile {
         draw_deed_card(g, &lay);
     }
 
@@ -1340,82 +1343,212 @@ fn draw_buildings(band: Rect, side: Side, count: u8) {
     }
 }
 
-fn draw_rail_icon(r: &Rect, side: Side) {
-    let (cx, cy) = match side {
-        Side::Bottom => (r.x + r.w * 0.5, r.y + r.h * 0.14),
-        Side::Top => (r.x + r.w * 0.5, r.y + r.h * 0.86),
-        Side::Left => (r.x + r.w * 0.88, r.y + r.h * 0.5),
-        Side::Right => (r.x + r.w * 0.12, r.y + r.h * 0.5),
+/// Where the pictogram of a side tile sits: in the band strip, clear of the name.
+fn icon_center(r: &Rect, side: Side) -> (f32, f32) {
+    match side {
+        Side::Bottom => (r.x + r.w * 0.5, r.y + r.h * 0.125),
+        Side::Top => (r.x + r.w * 0.5, r.y + r.h * 0.875),
+        Side::Left => (r.x + r.w * 0.87, r.y + r.h * 0.5),
+        Side::Right => (r.x + r.w * 0.13, r.y + r.h * 0.5),
         Side::Corner => (r.x + r.w * 0.5, r.y + r.h * 0.5),
-    };
-    let s = (r.w * 0.26).min(19.0);
-    draw_rectangle(cx - s * 0.5, cy - s * 0.5, s, s, Color { r: 0.18, g: 0.18, b: 0.18, a: 1.0 });
-    draw_line(cx - s * 0.26, cy - s * 0.34, cx - s * 0.26, cy + s * 0.34, 1.4, TILE);
-    draw_line(cx + s * 0.26, cy - s * 0.34, cx + s * 0.26, cy + s * 0.34, 1.4, TILE);
-    for k in 0..3 {
-        let ty = cy - s * 0.24 + k as f32 * s * 0.24;
-        draw_line(cx - s * 0.36, ty, cx + s * 0.36, ty, 1.3, TILE);
     }
 }
 
-fn draw_utility_icon(r: &Rect, side: Side) {
-    let (cx, cy) = match side {
-        Side::Bottom => (r.x + r.w * 0.5, r.y + r.h * 0.14),
-        Side::Top => (r.x + r.w * 0.5, r.y + r.h * 0.86),
-        Side::Left => (r.x + r.w * 0.88, r.y + r.h * 0.5),
-        Side::Right => (r.x + r.w * 0.12, r.y + r.h * 0.5),
-        Side::Corner => (r.x + r.w * 0.5, r.y + r.h * 0.5),
-    };
-    let s = (r.w * 0.20).min(15.0);
-    draw_circle(cx, cy - s * 0.10, s * 0.46, Color { r: 0.97, g: 0.78, b: 0.16, a: 1.0 });
+fn icon_size(r: &Rect) -> f32 {
+    // Kept inside the colour band so the name below it stays clear.
+    (r.w * 0.26).min(20.0)
+}
+
+const PLATE: Color = Color { r: 0.114, g: 0.157, b: 0.145, a: 1.0 };
+const CELL: Color = Color { r: 0.192, g: 0.243, b: 0.224, a: 1.0 };
+const LEAF: Color = Color { r: 0.180, g: 0.451, b: 0.259, a: 1.0 };
+const STEEL: Color = Color { r: 0.337, g: 0.502, b: 0.620, a: 1.0 };
+const WATER: Color = Color { r: 0.196, g: 0.451, b: 0.741, a: 1.0 };
+const BOLT: Color = Color { r: 0.949, g: 0.769, b: 0.145, a: 1.0 };
+const CHEST_BODY: Color = Color { r: 0.157, g: 0.310, b: 0.573, a: 1.0 };
+const CHEST_LID: Color = Color { r: 0.243, g: 0.416, b: 0.686, a: 1.0 };
+
+/// A little locomotive on its rails: the four stations.
+fn draw_rail_icon(r: &Rect, side: Side) {
+    let (cx, cy) = icon_center(r, side);
+    let s = icon_size(r);
+    // Track first, so the engine sits on it.
+    let ry = cy + s * 0.36;
+    draw_line(cx - s * 0.48, ry, cx + s * 0.48, ry, 1.5, INK_SOFT);
+    for k in 0..5 {
+        let x = cx - s * 0.38 + k as f32 * s * 0.19;
+        draw_line(x, ry - s * 0.04, x, ry + s * 0.09, 1.2, INK_SOFT);
+    }
+    // The engine, in one dark silhouette: boiler, cab, chimney.
+    draw_rectangle(cx - s * 0.38, cy - s * 0.04, s * 0.56, s * 0.26, INK);
+    draw_rectangle(cx + s * 0.08, cy - s * 0.28, s * 0.30, s * 0.50, INK);
+    draw_rectangle(cx - s * 0.34, cy - s * 0.30, s * 0.14, s * 0.26, INK);
+    draw_circle(cx - s * 0.06, cy - s * 0.06, s * 0.10, INK);
+    // Its window, then the wheels and a puff of smoke on the cream tile.
+    draw_rectangle(cx + s * 0.15, cy - s * 0.18, s * 0.16, s * 0.16, TILE);
+    for k in 0..3 {
+        let wx = cx - s * 0.26 + k as f32 * s * 0.24;
+        draw_circle(wx, cy + s * 0.28, s * 0.088, GOLD);
+    }
+    draw_circle(cx - s * 0.30, cy - s * 0.42, s * 0.055, Color { a: 0.45, ..INK });
+}
+
+/// Water Works: a tap with a drop falling out of it.
+fn draw_water_icon(r: &Rect, side: Side) {
+    let (cx, cy) = icon_center(r, side);
+    let s = icon_size(r);
+    // The pipe runs in from the left, then bends down into a spout.
+    draw_rectangle(cx - s * 0.50, cy - s * 0.34, s * 0.40, s * 0.22, STEEL);
+    draw_rectangle(cx - s * 0.28, cy - s * 0.34, s * 0.26, s * 0.58, STEEL);
+    draw_rectangle(cx - s * 0.32, cy + s * 0.14, s * 0.34, s * 0.10, STEEL);
+    // The valve on top of the pipe.
+    draw_rectangle(cx - s * 0.40, cy - s * 0.48, s * 0.26, s * 0.10, GOLD);
+    draw_rectangle(cx - s * 0.28, cy - s * 0.48, s * 0.08, s * 0.18, GOLD);
+    // The drop.
+    draw_circle(cx - s * 0.15, cy + s * 0.34, s * 0.115, WATER);
     draw_triangle(
-        vec2(cx - s * 0.34, cy + s * 0.25),
-        vec2(cx + s * 0.34, cy + s * 0.25),
-        vec2(cx, cy + s * 0.58),
-        Color { r: 0.97, g: 0.78, b: 0.16, a: 1.0 },
+        vec2(cx - s * 0.265, cy + s * 0.30),
+        vec2(cx - s * 0.035, cy + s * 0.30),
+        vec2(cx - s * 0.15, cy + s * 0.10),
+        WATER,
     );
+}
+
+/// Electric Company: a lightning bolt.
+fn draw_power_icon(r: &Rect, side: Side) {
+    let (cx, cy) = icon_center(r, side);
+    let s = icon_size(r);
+    draw_triangle(
+        vec2(cx + s * 0.02, cy - s * 0.48),
+        vec2(cx + s * 0.40, cy - s * 0.48),
+        vec2(cx - s * 0.16, cy + s * 0.10),
+        BOLT,
+    );
+    draw_triangle(
+        vec2(cx - s * 0.10, cy + s * 0.02),
+        vec2(cx + s * 0.24, cy + s * 0.02),
+        vec2(cx - s * 0.02, cy + s * 0.48),
+        BOLT,
+    );
+}
+
+/// Chance: the little card with its question mark.
+fn draw_chance_icon(r: &Rect, side: Side) {
+    let (cx, cy) = icon_center(r, side);
+    let s = icon_size(r) * 0.98;
+    let w = s * 0.76;
+    round_rect(cx - w * 0.5 + 1.3, cy - s * 0.5 + 1.3, w, s, 1.5, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.13 });
+    round_rect(cx - w * 0.5, cy - s * 0.5, w, s, 1.5, TILE);
+    round_outline(cx - w * 0.5, cy - s * 0.5, w, s, 1.5, 1.4, WINE);
+    centered_bold("?", cx, cy, s * 0.68, WINE);
+}
+
+/// Community Chest: a banded treasure chest.
+fn draw_chest_icon(r: &Rect, side: Side) {
+    let (cx, cy) = icon_center(r, side);
+    let s = icon_size(r) * 0.96;
+    let w = s * 1.02;
+    let top = cy - s * 0.44;
+    draw_rectangle(cx - w * 0.46, top + s * 0.34, w * 0.92, s * 0.52, CHEST_BODY);
+    round_rect(cx - w * 0.46, top, w * 0.92, s * 0.36, 2.0, CHEST_LID);
+    draw_line(cx - w * 0.46, top + s * 0.34, cx + w * 0.46, top + s * 0.34, 1.3, PLATE);
+    for k in 0..2 {
+        let bx = cx - w * 0.23 + k as f32 * w * 0.46;
+        draw_rectangle(bx - w * 0.045, top, w * 0.09, s * 0.86, GOLD);
+    }
+    draw_rectangle(cx - w * 0.10, top + s * 0.26, w * 0.20, s * 0.20, GOLD);
+    draw_circle(cx, top + s * 0.34, w * 0.032, PLATE);
 }
 
 fn draw_corner(space: &Space, r: Rect) {
     let cx = r.x + r.w * 0.5;
     match space.kind {
         Kind::Go => {
-            centered_bold(i18n::t("GO", "DÉPART"), cx, r.y + r.h * 0.30, r.w * 0.22, INK);
-            centered(i18n::t("COLLECT", "ENCAISSEZ"), cx, r.y + r.h * 0.50, r.w * 0.090, INK_SOFT);
-            centered_bold("200$", cx, r.y + r.h * 0.59, r.w * 0.120, INK_SOFT);
-            // The little red car that drives off the board.
-            let cy = r.y + r.h * 0.78;
-            draw_rectangle(r.x + r.w * 0.30, cy - r.h * 0.035, r.w * 0.40, r.h * 0.055, WINE);
-            draw_rectangle(r.x + r.w * 0.38, cy - r.h * 0.075, r.w * 0.22, r.h * 0.045, WINE);
-            draw_circle(r.x + r.w * 0.36, cy + r.h * 0.025, r.w * 0.045, INK);
-            draw_circle(r.x + r.w * 0.64, cy + r.h * 0.025, r.w * 0.045, INK);
+            centered_bold(i18n::t("GO", "DÉPART"), cx, r.y + r.h * 0.22, r.w * 0.22, INK);
+            centered(i18n::t("COLLECT", "ENCAISSEZ"), cx, r.y + r.h * 0.40, r.w * 0.090, INK_SOFT);
+            centered_bold("200$", cx, r.y + r.h * 0.49, r.w * 0.120, INK_SOFT);
+            // A little red car, with its windows, its hubcaps and a trail of dust.
+            let cy = r.y + r.h * 0.74;
+            let bx = r.x + r.w * 0.24;
+            let bw = r.w * 0.56;
+            for k in 0..3 {
+                let tx = bx - r.w * 0.04 - k as f32 * r.w * 0.05;
+                draw_line(tx, cy + r.h * 0.012, tx - r.w * 0.03, cy + r.h * 0.012, 1.2, INK_LINE);
+            }
+            round_rect(bx, cy - r.h * 0.030, bw, r.h * 0.062, r.h * 0.018, WINE);
+            round_rect(bx + bw * 0.26, cy - r.h * 0.082, bw * 0.46, r.h * 0.058, r.h * 0.014, WINE);
+            draw_rectangle(bx + bw * 0.32, cy - r.h * 0.076, bw * 0.15, r.h * 0.036, CREAM);
+            draw_rectangle(bx + bw * 0.50, cy - r.h * 0.076, bw * 0.15, r.h * 0.036, CREAM);
+            draw_circle(bx + bw * 0.26, cy + r.h * 0.034, r.h * 0.030, INK);
+            draw_circle(bx + bw * 0.74, cy + r.h * 0.034, r.h * 0.030, INK);
+            draw_circle(bx + bw * 0.26, cy + r.h * 0.034, r.h * 0.012, CREAM_DIM);
+            draw_circle(bx + bw * 0.74, cy + r.h * 0.034, r.h * 0.012, CREAM_DIM);
+            draw_circle(bx + bw - 2.0, cy - r.h * 0.002, r.h * 0.011, GOLD);
         }
         Kind::Jail => {
-            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.22, r.w * 0.20, INK);
-            centered(i18n::t("JUST", "SIMPLE"), cx, r.y + r.h * 0.62, r.w * 0.085, INK_SOFT);
-            centered(i18n::t("VISITING", "VISITE"), cx, r.y + r.h * 0.72, r.w * 0.085, INK_SOFT);
-            for k in 0..5 {
-                let bx = r.x + r.w * 0.24 + k as f32 * r.w * 0.105;
-                draw_line(bx, r.y + r.h * 0.33, bx, r.y + r.h * 0.49, 2.0, INK);
+            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.20, r.w * 0.20, INK);
+            // A barred window onto a dark cell, set in a heavy frame.
+            let bw = r.w * 0.56;
+            let bh = r.h * 0.21;
+            let bx = cx - bw * 0.5;
+            let by = r.y + r.h * 0.29;
+            round_rect(bx - 2.5, by - 2.5, bw + 5.0, bh + 5.0, 2.0, INK);
+            draw_rectangle(bx, by, bw, bh, CELL);
+            for k in 1..5 {
+                let lx = bx + bw * k as f32 / 5.0;
+                draw_line(lx, by, lx, by + bh, 1.8, CREAM_DIM);
             }
-            draw_line(r.x + r.w * 0.22, r.y + r.h * 0.33, r.x + r.w * 0.78, r.y + r.h * 0.33, 2.0, INK);
-            draw_line(r.x + r.w * 0.22, r.y + r.h * 0.49, r.x + r.w * 0.78, r.y + r.h * 0.49, 2.0, INK);
+            draw_line(bx, by + bh * 0.5, bx + bw, by + bh * 0.5, 1.4, CREAM_DIM);
+            centered(i18n::t("JUST", "SIMPLE"), cx, r.y + r.h * 0.66, r.w * 0.085, INK_SOFT);
+            centered(i18n::t("VISITING", "VISITE"), cx, r.y + r.h * 0.76, r.w * 0.085, INK_SOFT);
         }
         Kind::FreeParking => {
-            centered_bold(i18n::t("FREE", "PARC"), cx, r.y + r.h * 0.30, r.w * 0.155, INK);
-            centered_bold(i18n::t("PARKING", "GRATUIT"), cx, r.y + r.h * 0.42, r.w * 0.130, INK);
-            let cy = r.y + r.h * 0.66;
-            draw_rectangle(r.x + r.w * 0.28, cy, r.w * 0.44, r.h * 0.075, WINE);
-            draw_rectangle(r.x + r.w * 0.36, cy - r.h * 0.045, r.w * 0.26, r.h * 0.050, WINE);
-            draw_circle(r.x + r.w * 0.34, cy + r.h * 0.085, r.w * 0.045, INK);
-            draw_circle(r.x + r.w * 0.66, cy + r.h * 0.085, r.w * 0.045, INK);
+            centered_bold(i18n::t("FREE", "PARC"), cx, r.y + r.h * 0.20, r.w * 0.155, INK);
+            centered_bold(i18n::t("PARKING", "GRATUIT"), cx, r.y + r.h * 0.32, r.w * 0.125, INK);
+            // A sunny little park: a tree, a bench and the sun above them.
+            let ground = r.y + r.h * 0.72;
+            let sun = (r.x + r.w * 0.76, r.y + r.h * 0.56);
+            draw_circle(sun.0, sun.1, r.w * 0.042, GOLD);
+            for k in 0..8 {
+                let a = k as f32 * std::f32::consts::FRAC_PI_4;
+                let (dx, dy) = (a.cos(), a.sin());
+                draw_line(
+                    sun.0 + dx * r.w * 0.062,
+                    sun.1 + dy * r.w * 0.062,
+                    sun.0 + dx * r.w * 0.085,
+                    sun.1 + dy * r.w * 0.085,
+                    1.3,
+                    GOLD_DIM,
+                );
+            }
+            draw_rectangle(cx - r.w * 0.020, ground - r.h * 0.055, r.w * 0.040, r.h * 0.115, WOOD);
+            draw_circle(cx, ground - r.h * 0.105, r.w * 0.088, LEAF);
+            draw_circle(cx - r.w * 0.058, ground - r.h * 0.062, r.w * 0.062, LEAF);
+            draw_circle(cx + r.w * 0.058, ground - r.h * 0.062, r.w * 0.062, LEAF);
+            let bx = r.x + r.w * 0.14;
+            let bw = r.w * 0.26;
+            draw_rectangle(bx, ground + r.h * 0.020, bw, r.h * 0.022, WOOD);
+            draw_line(bx + 2.0, ground + r.h * 0.042, bx + 2.0, ground + r.h * 0.078, 1.4, WOOD);
+            draw_line(bx + bw - 2.0, ground + r.h * 0.042, bx + bw - 2.0, ground + r.h * 0.078, 1.4, WOOD);
+            draw_line(r.x + r.w * 0.10, ground + r.h * 0.100, r.x + r.w * 0.90, ground + r.h * 0.100, 1.2, INK_LINE);
         }
         _ => {
-            centered_bold(i18n::t("GO TO", "ALLEZ EN"), cx, r.y + r.h * 0.31, r.w * 0.135, INK);
-            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.46, r.w * 0.175, INK);
-            let y = r.y + r.h * 0.70;
-            draw_line(r.x + r.w * 0.44, y, r.x + r.w * 0.76, y, 2.5, INK);
-            draw_triangle(vec2(r.x + r.w * 0.80, y), vec2(r.x + r.w * 0.70, y - 6.0), vec2(r.x + r.w * 0.70, y + 6.0), INK);
+            centered_bold(i18n::t("GO TO", "ALLEZ EN"), cx, r.y + r.h * 0.22, r.w * 0.125, INK);
+            centered_bold(i18n::t("JAIL", "PRISON"), cx, r.y + r.h * 0.35, r.w * 0.165, INK);
+            // An arrow driving straight into a barred door.
+            let bh = r.h * 0.22;
+            let by = r.y + r.h * 0.52;
+            let bw = r.w * 0.28;
+            let bx = r.x + r.w * 0.62;
+            round_rect(bx - 2.0, by - 2.0, bw + 4.0, bh + 4.0, 1.5, INK);
+            draw_rectangle(bx, by, bw, bh, CELL);
+            for k in 1..4 {
+                let lx = bx + bw * k as f32 / 4.0;
+                draw_line(lx, by, lx, by + bh, 1.6, CREAM_DIM);
+            }
+            let ay = by + bh * 0.5;
+            draw_line(r.x + r.w * 0.12, ay, bx - 1.0, ay, 2.4, INK);
+            draw_triangle(vec2(bx + 1.5, ay), vec2(bx - 6.5, ay - 5.5), vec2(bx - 6.5, ay + 5.5), INK);
         }
     }
 }
@@ -1449,23 +1582,15 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
         } else if space.kind == Kind::Railroad {
             draw_rail_icon(&r, side);
         } else if space.kind == Kind::Utility {
-            draw_utility_icon(&r, side);
-        } else if space.kind == Kind::Chance || space.kind == Kind::Chest {
-            let (cx, cy) = match side {
-                Side::Bottom => (r.x + r.w * 0.5, r.y + r.h * 0.12),
-                Side::Top => (r.x + r.w * 0.5, r.y + r.h * 0.88),
-                Side::Left => (r.x + r.w * 0.88, r.y + r.h * 0.5),
-                Side::Right => (r.x + r.w * 0.12, r.y + r.h * 0.5),
-                Side::Corner => (r.x + r.w * 0.5, r.y + r.h * 0.5),
-            };
-            let s = (r.w * 0.30).min(21.0);
-            let color = if space.kind == Kind::Chance {
-                ACCENT
+            if space.name.starts_with("Water") {
+                draw_water_icon(&r, side);
             } else {
-                Color { r: 0.19, g: 0.38, b: 0.68, a: 1.0 }
-            };
-            draw_rectangle(cx - s * 0.5, cy - s * 0.5, s, s, color);
-            centered_bold("?", cx, cy, s * 0.9, WHITE);
+                draw_power_icon(&r, side);
+            }
+        } else if space.kind == Kind::Chance {
+            draw_chance_icon(&r, side);
+        } else if space.kind == Kind::Chest {
+            draw_chest_icon(&r, side);
         }
 
         let tr = text_rect(&r, side);
