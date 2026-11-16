@@ -118,6 +118,9 @@ pub struct Board {
     /// `None` once a board has been imported: an imported board keeps its own
     /// names whatever the interface language is.
     pub language: Option<String>,
+    /// The classic board of its language: only those follow the interface
+    /// language. A themed or imported table keeps its own names.
+    pub classic: bool,
     pub groups: Vec<ColorGroup>,
     pub spaces: Vec<Space>,
 }
@@ -174,6 +177,7 @@ impl Board {
         BoardFile {
             name: self.name.clone(),
             language: self.language.clone(),
+            classic: self.classic,
             groups: self
                 .groups
                 .iter()
@@ -304,6 +308,7 @@ impl Board {
         Ok(Board {
             name,
             language: file.language.map(|l| l.to_ascii_lowercase()),
+            classic: file.classic,
             groups,
             spaces,
         })
@@ -349,6 +354,8 @@ pub struct BoardFile {
     #[serde(default)]
     pub language: Option<String>,
     #[serde(default)]
+    pub classic: bool,
+    #[serde(default)]
     pub groups: Vec<GroupFile>,
     pub spaces: Vec<SpaceFile>,
 }
@@ -375,22 +382,38 @@ pub struct SpaceFile {
     pub tax: u32,
 }
 
-/// The two boards that ship with the game.
-const EN_BOARD: &str = include_str!("../assets/boards/classic-en.json");
-const FR_BOARD: &str = include_str!("../assets/boards/classic-fr.json");
+/// The boards that ship with the game, in the order the picker lists them.
+const BUILTINS: &[(&str, &str)] = &[
+    ("classic-en", include_str!("../assets/boards/classic-en.json")),
+    ("classic-fr", include_str!("../assets/boards/classic-fr.json")),
+    ("saint-etienne", include_str!("../assets/boards/saint-etienne.json")),
+    ("fun", include_str!("../assets/boards/fun.json")),
+];
 
+/// Ids of the boards compiled into the executable.
+pub fn builtin_ids() -> impl Iterator<Item = &'static str> {
+    BUILTINS.iter().map(|(id, _)| *id)
+}
+
+pub fn builtin_by_id(id: &str) -> Option<Board> {
+    let (_, text) = BUILTINS.iter().find(|(key, _)| *key == id)?;
+    Board::parse(text).ok()
+}
+
+/// The classic board of a language: the only one that follows the interface.
 pub fn builtin(language: &str) -> Option<Board> {
-    let text = match language {
-        "en" => EN_BOARD,
-        "fr" => FR_BOARD,
+    let id = match language {
+        "en" => "classic-en",
+        "fr" => "classic-fr",
         _ => return None,
     };
-    Board::parse(text).ok()
+    builtin_by_id(id)
 }
 
 /// Board used when nothing else is chosen.
 pub fn default_board() -> Board {
-    builtin(crate::i18n::code().to_ascii_lowercase().as_str())
+    let language = crate::i18n::code().to_ascii_lowercase();
+    builtin(&language)
         .or_else(|| builtin("en"))
         .expect("the boards shipped with the game must parse")
 }
@@ -398,6 +421,22 @@ pub fn default_board() -> Board {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_shipped_board_parses_and_ends_somewhere_else() {
+        let mut names = Vec::new();
+        for id in builtin_ids() {
+            let b = builtin_by_id(id).unwrap_or_else(|| panic!("{} failed to parse", id));
+            assert_eq!(b.spaces.len(), SPACES, "{} spaces", id);
+            assert!(!b.groups.is_empty(), "{} groups", id);
+            names.push(b.spaces[SPACES - 1].name.clone());
+        }
+        assert_eq!(names.len(), 4, "four boards ship with the game");
+        let mut ends = names.clone();
+        ends.sort();
+        ends.dedup();
+        assert_eq!(ends.len(), names.len(), "two boards share their last space");
+    }
 
     #[test]
     fn a_board_survives_a_round_trip_through_a_save() {

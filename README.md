@@ -26,12 +26,14 @@ every seat be a bot and watch it play itself:
   every seat: solo against bots, a mixed table, or a game with **no human at all**
   (set every seat to BOT and watch it play itself).
 - A **configurable board**: the table is one JSON file - names, prices, rents,
-  colours and the order of the four sides - so the two boards shipped with the
-  game (the classic English one and a French one) can be swapped for anyone's
-  own or freely edited. **BOARD > CHANGE** lists them, imports a file with the
-  system's file picker, and deletes the imported ones; the two included boards
-  stay. Switching the interface language swaps the shipped board for the one in
-  that language, and an imported board keeps its own names.
+  colours and the order of the four sides - so the boards shipped with the game
+  (the classic English and French ones, a **Saint-Étienne** table and a
+  **fun** one) can be swapped for anyone's own or freely edited. **BOARD >
+  CHANGE** lists them, imports a file with the system's file picker, and deletes
+  the imported ones; the included boards stay. Switching the interface language
+  swaps the classic board for the one in that language, in the setup screen as
+  well as in the middle of a game, while a themed or imported board keeps its
+  own names.
 - The complete **40-space official board**: all streets, colour groups, prices,
   rents, houses/hotels, four railroads and two utilities, Income Tax, Luxury Tax,
   Jail / Just Visiting, Free Parking, Go To Jail, Chance and Community Chest,
@@ -157,8 +159,9 @@ the board to play on and the FR / EN switch:
 
 ![Setup screen](docs/setup.png)
 
-The board list: the two included boards, the imported ones under them with a
-cross to delete them, and the import button:
+The board list: the four included boards (classic English, classic French,
+Saint-Étienne and a fun one), the imported ones under them with a cross to
+delete them, and the import button:
 
 ![The board picker](docs/boards.png)
 
@@ -311,11 +314,13 @@ every log message follow the active language. All strings live in two places:
 messages) and the bilingual card texts in `src/cards.rs`, so adding a language
 only touches those two modules.
 
-The **board** follows that switch: a shipped board gives way to the shipped board
-of the new language (the classic English table, or the French one with its own
-streets, stations and companies), so the two never contradict each other. A board
-the player picked by hand stays until the next language change, and an **imported
-board keeps its own names** whatever the interface language is.
+The **board** follows that switch: the *classic* board gives way to the classic
+board of the new language (the English table, or the French one with its own
+streets, stations and companies), so the two never contradict each other. This
+happens on the setup screen **and in the middle of a game** - the players, their
+money and their deeds stay put, only the names and prices of the table change. A
+themed board (Saint-Étienne, the fun one) or an **imported board keeps its own
+names** whatever the interface language is.
 
 ## Boards
 
@@ -355,10 +360,16 @@ at GO and running counter-clockwise as seen from the players' side: bottom edge
   Community Chest keep the printed cards, and the "advance to" cards name the
   space at their index on the board being played, so a French or imported board
   is never sent to an English street.
-- Ships with `assets/boards/classic-en.json` and `classic-fr.json`, compiled into
-  the executable. **IMPORT A FILE** copies any other board into
+- `"classic": true` marks the one board of a language that follows the interface
+  language switch; leave it out (or false) for a themed table, which keeps its
+  names even in a game.
+- Ships with four boards, compiled into the executable: `classic-en.json`,
+  `classic-fr.json`, `saint-etienne.json` (the city's streets, stations, the
+  Chaudron, Geoffroy-Guichard, Manufrance) and `fun.json` (the grand n'importe
+  quoi: the avenue de la Sieste, the Wi-Fi du voisin, the case de l'Incroyable
+  Victoire). **IMPORT A FILE** copies any other board into
   `%APPDATA%\\Crazypoly\\boards` (`~/.local/share/Crazyopoly/boards` on Linux),
-  where it stays listed until its cross deletes it; the two included boards can
+  where it stays listed until its cross deletes it; the included boards can
   never be overwritten or removed.
 
 ## Project layout
@@ -370,7 +381,7 @@ assets/
   PlayfairDisplay.ttf               titles (SIL OFL, see OFL-Playfair.txt)
   audio/                            music + effects (WAV, generated, see Sound)
   boards/                          the included tables, compiled into the game
-    classic-en.json, classic-fr.json
+    classic-en.json, classic-fr.json, saint-etienne.json, fun.json
 src/
   audio.rs   music and effects: embedded WAVs, one-shot playback, the two toggles
   main.rs    window setup, app state, frame loop

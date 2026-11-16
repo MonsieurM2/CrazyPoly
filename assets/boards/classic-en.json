@@ -1,6 +1,7 @@
 {
   "name": "Classic (English)",
   "language": "en",
+  "classic": true,
   "groups": [
     { "name": "Brown", "color": "#954936" },
     { "name": "Light Blue", "color": "#aae0fa" },

@@ -1,6 +1,7 @@
 {
   "name": "Classique (français)",
   "language": "fr",
+  "classic": true,
   "groups": [
     { "name": "Marron", "color": "#954936" },
     { "name": "Bleu clair", "color": "#aae0fa" },

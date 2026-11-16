@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 
 use crate::board::{self, Board};
 
-/// Ids of the boards that ship with the game.
+/// Id of the English classic board: the fallback whenever no other id fits.
 pub const EN: &str = "classic-en";
-pub const FR: &str = "classic-fr";
 
 /// One board offered in the picker.
 #[derive(Clone)]
@@ -50,17 +49,19 @@ fn builtin_board(language: &str) -> Option<Board> {
 }
 
 pub fn id_of(board: &Board) -> String {
-    match board.language.as_deref() {
-        Some("fr") => FR.to_string(),
-        _ => EN.to_string(),
+    for id in board::builtin_ids() {
+        if board::builtin_by_id(id).map(|b| b.name == board.name).unwrap_or(false) {
+            return id.to_string();
+        }
     }
+    EN.to_string()
 }
 
 /// Every board the player can choose from, shipped ones first.
 pub fn list() -> Vec<Entry> {
     let mut out = Vec::new();
-    for (id, lang) in [(EN, "en"), (FR, "fr")] {
-        if let Some(b) = builtin_board(lang) {
+    for id in board::builtin_ids() {
+        if let Some(b) = board::builtin_by_id(id) {
             out.push(Entry {
                 id: id.to_string(),
                 name: b.name,
@@ -101,24 +102,12 @@ pub fn list() -> Vec<Entry> {
 }
 
 pub fn load(id: &str) -> Result<Board, String> {
-    match id {
-        EN => builtin_board("en").ok_or_else(corrupt),
-        FR => builtin_board("fr").ok_or_else(corrupt),
-        _ => {
-            let path = dir().join(format!("{id}.json"));
-            let text = fs::read_to_string(&path)
-                .map_err(|e| format!("{}: {}", path.display(), e))?;
-            Board::parse(&text)
-        }
+    if let Some(board) = board::builtin_by_id(id) {
+        return Ok(board);
     }
-}
-
-fn corrupt() -> String {
-    crate::i18n::t(
-        "A board shipped with the game failed to load.",
-        "Un plateau fourni avec le jeu n'a pas pu être chargé.",
-    )
-    .to_string()
+    let path = dir().join(format!("{id}.json"));
+    let text = fs::read_to_string(&path).map_err(|e| format!("{}: {}", path.display(), e))?;
+    Board::parse(&text)
 }
 
 /// Copies a board file into the game's folder. Returns the new entry.
@@ -154,7 +143,7 @@ pub fn import(path: &Path) -> Result<Entry, String> {
 
 /// Removes an imported board. The shipped ones are refused.
 pub fn delete(id: &str) -> Result<(), String> {
-    if id == EN || id == FR {
+    if board::builtin_by_id(id).is_some() {
         return Err(crate::i18n::t(
             "The boards included with the game cannot be deleted.",
             "Les plateaux fournis avec le jeu ne peuvent pas être supprimés.",
@@ -200,6 +189,10 @@ fn slug(name: &str) -> String {
 /// shipped board of the new language. An imported board keeps its own names
 /// and stays selected.
 pub fn following_language(current: &Board) -> Option<Board> {
+    // A themed or imported board keeps its own names whatever the language.
+    if !current.classic {
+        return None;
+    }
     let current_language = current.language.as_deref()?;
     let wanted = crate::i18n::code().to_ascii_lowercase();
     if current_language == wanted {
@@ -251,6 +244,16 @@ mod tests {
         assert!(Board::parse(&short).is_err());
         // A colour that is not #rrggbb.
         assert!(Board::parse(&text.replace("#954936", "brown")).is_err());
+    }
+
+    #[test]
+    fn only_a_classic_board_follows_the_language() {
+        let classic = board::builtin("fr").unwrap();
+        assert!(following_language(&classic).is_none(), "already the right language");
+        let themed = board::builtin_by_id("saint-etienne").unwrap();
+        assert!(following_language(&themed).is_none(), "a themed board keeps its names");
+        assert!(!themed.classic);
+        assert!(classic.classic);
     }
 
     #[test]

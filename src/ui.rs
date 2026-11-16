@@ -563,6 +563,8 @@ pub struct Ui {
     pub vote_open: bool,
     pub vote_agree: Vec<bool>,
     pub quit_confirm: bool,
+    /// Interface language the board was last matched against, in game.
+    pub last_language: String,
 }
 
 impl Ui {
@@ -583,6 +585,7 @@ impl Ui {
             vote_open: false,
             vote_agree: Vec::new(),
             quit_confirm: false,
+            last_language: i18n::code().to_string(),
         }
     }
 }
@@ -1413,6 +1416,17 @@ fn active_modal(g: &Game, ui: &Ui) -> Modal {
 }
 
 fn draw_play(app: &mut App) {
+    // A language switch in the middle of a game renames the table: a classic
+    // board follows the new language, a themed or imported one keeps its own.
+    let language = i18n::code().to_string();
+    if language != app.ui.last_language {
+        app.ui.last_language = language;
+        if let Some(game) = app.game.as_mut() {
+            if let Some(board) = crate::boards::following_language(&game.board) {
+                game.set_board(board);
+            }
+        }
+    }
     let App { screen, game, ui, .. } = app;
     let Some(g) = game.as_mut() else {
         return;

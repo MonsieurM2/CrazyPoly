@@ -253,6 +253,14 @@ impl Game {
 
     // ---------------------------------------------------------------- helpers
 
+    /// Swaps the table without touching the game state: used when the
+    /// interface language changes in the middle of a game. Only a classic
+    /// board is ever replaced, and the two share the same 40 spaces.
+    pub fn set_board(&mut self, board: board::Board) {
+        self.spaces = board.spaces.clone();
+        self.board = board;
+    }
+
     pub fn log(&mut self, msg: impl Into<String>) {
         self.log.push(msg.into());
         if self.log.len() > 400 {
