@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use macroquad::prelude::*;
 
 use crate::board::{Kind, Space};
+use crate::fx::Fx;
 use crate::game::{Game, Phase, TradeState, MAX_HOUSES};
 use crate::i18n;
 use crate::tokens;
@@ -194,6 +195,13 @@ fn inr(r: Rect, x: f32, y: f32) -> bool {
     x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
 }
 
+/// Overshoots slightly before settling on 1, for things that land.
+fn ease_out_back(x: f32) -> f32 {
+    let c1 = 1.70158;
+    let c3 = c1 + 1.0;
+    1.0 + c3 * (x - 1.0).powi(3) + c1 * (x - 1.0).powi(2)
+}
+
 fn money(v: i64) -> String {
     let sign = if v < 0 { "-" } else { "" };
     let digits = v.abs().to_string();
@@ -305,6 +313,26 @@ fn round_card(x: f32, y: f32, w: f32, h: f32, r: f32, fill: Color, edge: Color) 
 }
 
 /// The felt table behind everything: a soft vertical gradient.
+/// A few motes of gold dust drifting over the felt, to keep the table alive.
+fn felt_motes() {
+    let sw = screen_width();
+    let sh = screen_height();
+    let t = get_time() as f32;
+    for i in 0..16 {
+        let fi = i as f32;
+        let speed = 6.0 + (i % 4) as f32 * 3.0;
+        let y = sh + 16.0 - ((t * speed + fi * 91.0) % (sh + 32.0));
+        let x = (fi * 211.0 + (t * 0.35 + fi).sin() * 34.0).rem_euclid(sw);
+        let a = 0.015 + 0.030 * ((t * 0.9 + fi * 1.3).sin() * 0.5 + 0.5);
+        draw_circle(
+            x,
+            y,
+            1.0 + (i % 3) as f32 * 0.5,
+            Color { r: 0.945, g: 0.863, b: 0.647, a },
+        );
+    }
+}
+
 fn felt_background() {
     let h = screen_height();
     let steps = 40;
@@ -321,6 +349,7 @@ fn felt_background() {
         draw_rectangle(0.0, y, screen_width(), next - y + 1.0, color);
         y = next;
     }
+    felt_motes();
 }
 
 fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
@@ -565,6 +594,13 @@ pub struct Ui {
     pub quit_confirm: bool,
     /// Interface language the board was last matched against, in game.
     pub last_language: String,
+    /// Sparks, coins, confetti, screen shake.
+    pub fx: Fx,
+    /// What changed on the table since the last frame.
+    pub watch: Watch,
+    /// Last auction bid drawn, and how long ago it changed.
+    pub bid_seen: i64,
+    pub bid_age: f32,
 }
 
 impl Ui {
@@ -586,6 +622,171 @@ impl Ui {
             vote_agree: Vec::new(),
             quit_confirm: false,
             last_language: i18n::code().to_string(),
+            fx: Fx::new(),
+            watch: Watch::new(),
+            bid_seen: -1,
+            bid_age: 10.0,
+        }
+    }
+}
+
+/// Colours of money coming in and going out.
+const MONEY_IN: Color = Color { r: 0.55, g: 0.94, b: 0.62, a: 1.0 };
+const MONEY_OUT: Color = Color { r: 0.96, g: 0.46, b: 0.40, a: 1.0 };
+
+/// Watches the table from one frame to the next and celebrates what changed.
+///
+/// The rules themselves stay silent: money moving, a deed changing hands, a
+/// house going up, a player jailed or wiped out and the end of the game are all
+/// read back from the state, so a human and a bot get exactly the same show.
+pub struct Watch {
+    ready: bool,
+    cash: Vec<i64>,
+    owner: Vec<Option<usize>>,
+    houses: Vec<u8>,
+    jailed: Vec<bool>,
+    bankrupt: Vec<bool>,
+    banner: f32,
+    over: bool,
+    rain: f32,
+    dice_anim: f32,
+}
+
+impl Watch {
+    pub fn new() -> Self {
+        Watch {
+            ready: false,
+            cash: Vec::new(),
+            owner: Vec::new(),
+            houses: Vec::new(),
+            jailed: Vec::new(),
+            bankrupt: Vec::new(),
+            banner: 0.0,
+            over: false,
+            rain: 0.0,
+            dice_anim: 0.0,
+        }
+    }
+
+    /// Forgets the table, so the next frame becomes the reference.
+    pub fn reset(&mut self) {
+        *self = Watch::new();
+    }
+
+    fn tile_around(geo: &Geo, tile: usize) -> Vec2 {
+        let r = geo.rect(tile);
+        vec2(r.x + r.w * 0.5, r.y + r.h * 0.5)
+    }
+
+    fn feed(&mut self, g: &Game, fx: &mut Fx, geo: &Geo, dt: f32) {
+        let n = g.players.len();
+        if !self.ready {
+            self.cash = g.players.iter().map(|p| p.cash).collect();
+            self.owner = g.props.iter().map(|p| p.owner).collect();
+            self.houses = g.props.iter().map(|p| p.houses).collect();
+            self.jailed = g.players.iter().map(|p| p.in_jail).collect();
+            self.bankrupt = g.players.iter().map(|p| p.bankrupt).collect();
+            self.banner = g.banner.as_ref().map(|b| b.1).unwrap_or(0.0);
+            self.over = g.phase == Phase::Over;
+            self.dice_anim = g.dice_anim;
+            self.ready = true;
+            return;
+        }
+
+        for i in 0..n {
+            let player = &g.players[i];
+            let was_cash = self.cash.get(i).copied().unwrap_or(player.cash);
+            let diff = player.cash - was_cash;
+            if diff != 0 && !player.bankrupt {
+                let at = Watch::tile_around(geo, player.pos) + vec2(0.0, -10.0);
+                if diff > 0 {
+                    fx.float(format!("+{}", money(diff)), at, MONEY_IN, 15.0);
+                    fx.coins(at, 4);
+                } else {
+                    fx.float(format!("-{}", money(-diff)), at, MONEY_OUT, 15.0);
+                    fx.spark(at, MONEY_OUT, 7);
+                }
+            }
+
+            let was_jail = self.jailed.get(i).copied().unwrap_or(false);
+            if player.in_jail && !was_jail {
+                let at = Watch::tile_around(geo, player.pos);
+                fx.shake(5.0);
+                fx.spark(at, Color::new(0.85, 0.85, 0.9, 1.0), 12);
+                fx.float(i18n::t("Jailed!", "En prison !"), at, WARN, 16.0);
+            }
+
+            let was_out = self.bankrupt.get(i).copied().unwrap_or(false);
+            if player.bankrupt && !was_out {
+                let at = Watch::tile_around(geo, player.pos);
+                fx.shake(11.0);
+                fx.flash(Color::new(0.92, 0.18, 0.14, 1.0), 0.42);
+                fx.spark(at, MONEY_OUT, 26);
+                fx.float(
+                    i18n::t("Bankrupt", "En faillite"),
+                    at,
+                    MONEY_OUT,
+                    17.0,
+                );
+            }
+        }
+        self.cash = g.players.iter().map(|p| p.cash).collect();
+        self.jailed = g.players.iter().map(|p| p.in_jail).collect();
+        self.bankrupt = g.players.iter().map(|p| p.bankrupt).collect();
+
+        for t in 0..g.props.len() {
+            let owner = g.props[t].owner;
+            let was_owner = self.owner.get(t).copied().flatten();
+            if owner != was_owner && owner.is_some() {
+                let at = Watch::tile_around(geo, t);
+                fx.stars(at, GOLD_SOFT, 7);
+                fx.spark(at, GOLD, 9);
+                fx.shake(2.0);
+            }
+            let houses = g.props[t].houses;
+            let was_houses = self.houses.get(t).copied().unwrap_or(houses);
+            if houses > was_houses && owner.is_some() {
+                let at = Watch::tile_around(geo, t);
+                fx.confetti(at, 7);
+                fx.shake(2.5);
+            }
+            self.owner[t] = owner;
+            self.houses[t] = houses;
+        }
+
+        // Dice leaving the hand, and dice landing.
+        if g.dice_anim > 0.0 && self.dice_anim <= 0.0 {
+            fx.shake(2.6);
+        }
+        if g.dice_anim <= 0.0 && self.dice_anim > 0.0 {
+            let c = geo.center();
+            let at = vec2(c.x + c.w * 0.5, c.y + c.h * 0.455);
+            fx.spark(at, Color::new(0.98, 0.92, 0.75, 1.0), 9);
+        }
+        self.dice_anim = g.dice_anim;
+
+        // A card being drawn: sparkles on the banner card at the centre.
+        let banner = g.banner.as_ref().map(|b| b.1).unwrap_or(0.0);
+        if banner > self.banner + 0.4 {
+            let c = geo.center();
+            fx.stars(vec2(c.x + c.w * 0.5, c.y + c.h * 0.85), GOLD_SOFT, 9);
+        }
+        self.banner = banner;
+
+        if g.phase == Phase::Over && !self.over {
+            let c = geo.center();
+            fx.rain(screen_width(), 110);
+            fx.shake(9.0);
+            fx.flash(Color::new(0.98, 0.86, 0.52, 1.0), 0.34);
+            fx.confetti(vec2(c.x + c.w * 0.5, c.y + c.h * 0.55), 40);
+        }
+        self.over = g.phase == Phase::Over;
+        if self.over {
+            self.rain += dt;
+            if self.rain > 1.6 {
+                self.rain = 0.0;
+                fx.rain(screen_width(), 28);
+            }
         }
     }
 }
@@ -1339,7 +1540,7 @@ struct Layout {
     right: Rect,
 }
 
-fn layout() -> Layout {
+fn layout(shake: (f32, f32)) -> Layout {
     let sw = screen_width();
     let sh = screen_height();
     let m = 20.0;
@@ -1348,8 +1549,10 @@ fn layout() -> Layout {
         .min(sw - 2.0 * side_want - 4.0 * m)
         .max(320.0);
     let side = ((sw - board_s - 4.0 * m) * 0.5).max(170.0);
-    let x0 = m;
-    let y0 = (sh - board_s) * 0.5;
+    // A screen shake slides the whole table, panels included, so the hit
+    // boxes follow the picture: the source of the tremble is the same layout.
+    let x0 = m + shake.0;
+    let y0 = (sh - board_s) * 0.5 + shake.1;
     let board_x = x0 + side + m;
     Layout {
         geo: Geo::new(board_x, y0, board_s),
@@ -1431,7 +1634,10 @@ fn draw_play(app: &mut App) {
     let Some(g) = game.as_mut() else {
         return;
     };
-    let lay = layout();
+    let dt = get_frame_time().min(0.05);
+    ui.fx.update(dt);
+    let lay = layout(ui.fx.offset());
+    ui.watch.feed(g, &mut ui.fx, &lay.geo, dt);
     let (mx, my) = mouse_position();
     let modal = active_modal(g, ui);
     let input = modal == Modal::None;
@@ -1446,13 +1652,16 @@ fn draw_play(app: &mut App) {
     if buying(g) && !over_tile {
         draw_deed_card(g, &lay);
     }
+    // Sparks, coins and confetti sit above the table, under the dialogs.
+    ui.fx.draw();
+    ui.fx.draw_labels(|text, x, y, size, color| txt_bold(text, x, y, size, color));
 
     let mut again = false;
     match modal {
         Modal::None | Modal::Waiting => {}
         Modal::Assets => draw_assets(g, ui, &lay),
         Modal::Trade => draw_trade(g, ui),
-        Modal::Auction => draw_auction(g),
+        Modal::Auction => draw_auction(g, ui),
         Modal::Debt => draw_debt(g, ui),
         Modal::Over => again = draw_over(g),
         Modal::Rules => draw_rules(ui),
@@ -1467,6 +1676,7 @@ fn draw_play(app: &mut App) {
             }
         }
     }
+    ui.fx.draw_flash();
     if again {
         *game = None;
         *screen = Screen::Setup;
@@ -1791,6 +2001,20 @@ fn draw_tile(g: &Game, geo: &Geo, i: usize, hover: bool) {
         draw_rectangle(r.x, r.y, r.w, r.h, HOVER);
     }
 
+    // A soft pulse under the player whose turn it is, so the eye finds them.
+    if i == g.players[g.turn].pos && g.phase != Phase::Over && !g.players[g.turn].bankrupt {
+        let t = get_time() as f32;
+        let pulse = 0.5 + 0.5 * (t * 2.4).sin();
+        draw_rectangle_lines(
+            r.x + 1.5,
+            r.y + 1.5,
+            r.w - 3.0,
+            r.h - 3.0,
+            2.0,
+            Color::new(GOLD.r, GOLD.g, GOLD.b, 0.22 + 0.5 * pulse),
+        );
+    }
+
     if space.corner() {
         draw_corner(space, r);
     } else {
@@ -1875,6 +2099,10 @@ fn draw_tokens(g: &Game, geo: &Geo) {
             if anim.player == i {
                 cy -= (anim.t * std::f32::consts::PI).sin() * r.h * 0.35;
             }
+        } else if i == g.turn && g.phase != Phase::Over {
+            // The player to move breathes, just enough to be seen.
+            let t = get_time() as f32;
+            cy -= 1.2 + 1.2 * (t * 2.4).sin();
         }
         // Round chip with the player's token drawn in white on it.
         let radius = (r.w * 0.165).clamp(8.0, 14.0);
@@ -1928,11 +2156,14 @@ fn draw_center(g: &Game, geo: &Geo) {
     serif_center(&label, cx, c.y + c.h * 0.705, c.w * 0.040, WINE);
     centered(&phase_hint(g), cx, c.y + c.h * 0.752, c.w * 0.023, INK_SOFT);
 
-    if let Some((text, _)) = &g.banner {
+    if let Some((text, left)) = &g.banner {
         let bcard_w = c.w * 0.76;
         let bcard_h = c.h * 0.22;
         let bx = c.x + (c.w - bcard_w) * 0.5;
-        let by2 = c.y + c.h - bcard_h - c.h * 0.02;
+        // The card lands: it drops in fast and settles with a small overshoot.
+        let age = (5.0 - left).clamp(0.0, 1.0);
+        let settle = ease_out_back((age / 0.30).min(1.0));
+        let by2 = c.y + c.h - bcard_h - c.h * 0.02 + (1.0 - settle) * bcard_h * 0.9;
         draw_rectangle(bx + 3.0, by2 + 5.0, bcard_w, bcard_h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.16 });
         draw_rectangle(bx, by2, bcard_w, bcard_h, TILE);
         draw_rectangle_lines(bx, by2, bcard_w, bcard_h, 1.5, GOLD);
@@ -2218,6 +2449,18 @@ fn draw_player_card(g: &Game, index: usize, r: Rect, debug: bool) {
     round_card(r.x, r.y, r.w, r.h, 12.0, fill, CARD_EDGE);
     if current {
         round_outline(r.x, r.y, r.w, r.h, 12.0, 1.4, GOLD);
+        // A halo that breathes, so the seat to play is found at a glance.
+        let t = get_time() as f32;
+        let glow = 0.10 + 0.16 * (t * 2.1).sin().max(0.0);
+        round_outline(
+            r.x - 2.0,
+            r.y - 2.0,
+            r.w + 4.0,
+            r.h + 4.0,
+            13.0,
+            2.0,
+            Color::new(GOLD.r, GOLD.g, GOLD.b, glow),
+        );
     }
 
     let radius = (r.h * 0.15).clamp(8.0, 15.0);
@@ -2668,7 +2911,7 @@ fn deed_card(g: &Game, tile: usize, x: f32, y: f32, w: f32, h: f32) {
     );
 }
 
-fn draw_auction(g: &mut Game) {
+fn draw_auction(g: &mut Game, ui: &mut Ui) {
     let Some(auction) = g.auction.as_ref() else {
         return;
     };
@@ -2689,6 +2932,19 @@ fn draw_auction(g: &mut Game) {
         .map(|(i, p)| (p.name.clone(), active[i], high == Some(i), p.color))
         .collect();
 
+    // A new bid lands with a bump and a small shower of gold.
+    if bid != ui.bid_seen {
+        if bid > ui.bid_seen {
+            let r = modal_rect(600.0, 550.0);
+            ui.fx
+                .spark(vec2(r.x + r.w * 0.5, r.y + 176.0), GOLD_SOFT, 8);
+        }
+        ui.bid_seen = bid;
+        ui.bid_age = 0.0;
+    }
+    ui.bid_age += get_frame_time();
+    let bump = 1.0 + 0.30 * (1.0 - (ui.bid_age / 0.30).min(1.0)).powi(2);
+
     let r = modal_rect(600.0, 550.0);
     let content = modal_shell(r, i18n::t("AUCTION", "ENCHÈRES"));
     centered_bold(&name, r.x + r.w * 0.5, content.y + 20.0, 21.0, TEXT);
@@ -2702,7 +2958,13 @@ fn draw_auction(g: &mut Game) {
 
     draw_rectangle(r.x + 40.0, content.y + 66.0, r.w - 80.0, 82.0, ROW_BG);
     centered(i18n::t("CURRENT BID", "ENCHÈRE ACTUELLE"), r.x + r.w * 0.5, content.y + 88.0, 11.5, MUTED);
-    centered_bold(&money(bid), r.x + r.w * 0.5, content.y + 122.0, 34.0, if bid > 0 { ACCENT } else { TEXT_DIM });
+    centered_bold(
+        &money(bid),
+        r.x + r.w * 0.5,
+        content.y + 122.0,
+        34.0 * bump,
+        if bid > 0 { ACCENT } else { TEXT_DIM },
+    );
 
     let mut y = content.y + 168.0;
     for (i, (pname, is_active, is_high, color)) in rows.iter().enumerate() {

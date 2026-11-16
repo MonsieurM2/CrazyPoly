@@ -42,6 +42,13 @@ every seat be a bot and watch it play itself:
   drop for Water Works, a bolt for Electric Company, a card for Chance, a banded
   chest for Community Chest, a barred cell for the jail, a park with its tree
   and its bench for Free Parking, and a little red car for GO.
+- **Feel**: every event answers on screen. Money floats up over the tile that
+  moved it - gold coins when it comes in, a red spark when it goes out - a lot
+  changing hands throws sparkles, a new house bursts confetti, a drawn card
+  slides in and glitters, doubles shake the table, a bankruptcy flashes it red,
+  the seat to play breathes gold, the token of the player to move rises and
+  falls, and a game won ends under falling confetti. Every effect is read back
+  from the game state, so bots get the same show as a human.
 - An **animated main menu**: gold dust drifts up over the felt, the rings behind
   the card breathe, the title carries a pulsing halo, the eight tokens float in a
   row and a sheen runs across **NEW GAME**. It offers **NEW GAME**, **CONTINUE**
@@ -395,6 +402,7 @@ src/
   dice_physics.rs   the throw itself: rapier3d world, recorded poses, face read-out
   tokens.rs  the eight player token designs, drawn with primitives
   persist.rs save/load (JSON, one slot)
+  fx.rs      juice: sparkles, coins, confetti, floating amounts, shake, flashes
   ui.rs      green table look: felt, wood-framed board, gold accents, three columns
 ```
 

@@ -25,6 +25,7 @@ mod ai;
 mod audio;
 mod board;
 mod boards;
+mod fx;
 mod cards;
 mod dice;
 mod dice_physics;
