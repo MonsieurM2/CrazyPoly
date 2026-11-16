@@ -5,6 +5,7 @@
 //! square board instead of leaving dead space.
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use macroquad::prelude::*;
@@ -313,6 +314,47 @@ fn round_card(x: f32, y: f32, w: f32, h: f32, r: f32, fill: Color, edge: Color) 
     round_rect(x + 1.0, y + 1.0, w - 2.0, h - 2.0, (r - 1.0).max(0.0), fill);
 }
 
+/// Blend two colours, for the sweeps of a hover.
+fn mix(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    Color {
+        r: a.r + (b.r - a.r) * t,
+        g: a.g + (b.g - a.g) * t,
+        b: a.b + (b.b - a.b) * t,
+        a: a.a + (b.a - a.a) * t,
+    }
+}
+
+// How far each button has been pulled into its hover state. A click answers
+// with a spark, but hovering must move the menu itself, not throw dust.
+thread_local! {
+    static HOVER_EASE: RefCell<HashMap<u64, f32>> = RefCell::new(HashMap::new());
+}
+
+fn button_hover(label: &str, r: Rect, hover: bool) -> f32 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    label.hash(&mut hasher);
+    ((r.x / 16.0).round() as i32).hash(&mut hasher);
+    (r.w.round() as i32).hash(&mut hasher);
+    let key = hasher.finish();
+    let dt = get_frame_time().clamp(0.0, 0.05);
+    HOVER_EASE.with(|map| {
+        let mut map = map.borrow_mut();
+        if map.len() > 96 {
+            map.clear();
+        }
+        let value = map.entry(key).or_insert(0.0);
+        let target = if hover { 1.0 } else { 0.0 };
+        *value += (target - *value) * (1.0 - (-16.0 * dt).exp());
+        if (*value - target).abs() < 0.002 {
+            *value = target;
+        }
+        *value
+    })
+}
+
 /// The felt table behind everything: a soft vertical gradient.
 /// A few motes of gold dust drifting over the felt, to keep the table alive.
 fn felt_motes() {
@@ -353,14 +395,15 @@ fn felt_background() {
     felt_motes();
 }
 
-fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
+fn button(hit: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let (mx, my) = mouse_position();
-    let hover = enabled && inr(r, mx, my);
-    if hover {
-        fx::queue_hover(vec2(mx, my));
-    }
+    let hover = enabled && inr(hit, mx, my);
+    // The button answers the cursor by moving: it lifts, its edge warms and a
+    // gold rule grows from the middle. No particles on hover.
+    let ease = if enabled { button_hover(label, hit, hover) } else { 0.0 };
+    let r = Rect::new(hit.x + ease * 6.0, hit.y - ease * 2.0, hit.w, hit.h);
     let radius = (r.h * 0.30).min(12.0);
-    let mut size = (r.h * 0.36).clamp(10.0, 16.0);
+    let mut size = (r.h * 0.36).clamp(10.0, 16.0) * (1.0 + 0.045 * ease);
     let label = if measure(label, size, true).width > r.w - 16.0 {
         while size > 9.5 && measure(label, size, true).width > r.w - 16.0 {
             size -= 0.5;
@@ -375,11 +418,23 @@ fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     if primary {
         let fill = if !enabled {
             Color { r: 0.235, g: 0.235, b: 0.161, a: 1.0 }
-        } else if hover {
-            GOLD_SOFT
         } else {
-            GOLD
+            mix(GOLD, GOLD_SOFT, ease)
         };
+        // A warm glow spreads under the button as it is held by the cursor.
+        if ease > 0.01 {
+            for k in (1..=3).rev() {
+                let g = k as f32;
+                round_rect(
+                    r.x - g * 3.0 * ease,
+                    r.y - g * 3.0 * ease,
+                    r.w + g * 6.0 * ease,
+                    r.h + g * 6.0 * ease,
+                    radius + g * 2.0,
+                    Color { r: 0.945, g: 0.835, b: 0.588, a: 0.05 * ease },
+                );
+            }
+        }
         round_rect(r.x, r.y, r.w, r.h, radius, fill);
         let fg = if enabled {
             Color { r: 0.075, g: 0.157, b: 0.114, a: 1.0 }
@@ -388,18 +443,38 @@ fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
         };
         draw_raw(&label, tx, ty, size, fg, true);
     } else {
-        if hover {
-            round_rect(r.x, r.y, r.w, r.h, radius, Color { r: 0.145, g: 0.310, b: 0.231, a: 1.0 });
+        if ease > 0.01 {
+            round_rect(
+                r.x,
+                r.y,
+                r.w,
+                r.h,
+                radius,
+                Color { r: 0.145, g: 0.310, b: 0.231, a: 0.95 * ease },
+            );
         }
         let edge = if !enabled {
             Color { r: 0.153, g: 0.251, b: 0.204, a: 1.0 }
-        } else if hover {
-            GOLD
         } else {
-            GOLD_DIM
+            mix(GOLD_DIM, GOLD, ease)
         };
         round_outline(r.x, r.y, r.w, r.h, radius, 1.2, edge);
-        let fg = if enabled { CREAM } else { Color { r: 0.357, g: 0.435, b: 0.376, a: 1.0 } };
+        if enabled && ease > 0.01 {
+            let half = (r.w * 0.5 - 22.0) * ease;
+            draw_line(
+                r.x + r.w * 0.5 - half,
+                r.y + r.h - 5.0,
+                r.x + r.w * 0.5 + half,
+                r.y + r.h - 5.0,
+                2.2,
+                Color { r: 0.945, g: 0.835, b: 0.588, a: ease },
+            );
+        }
+        let fg = if enabled {
+            mix(CREAM, GOLD_SOFT, ease * 0.65)
+        } else {
+            Color { r: 0.357, g: 0.435, b: 0.376, a: 1.0 }
+        };
         draw_raw(&label, tx, ty, size, fg, true);
     }
     let clicked = enabled && hover && is_mouse_button_pressed(MouseButton::Left);
@@ -715,7 +790,7 @@ impl Watch {
         let at = Watch::tile_around(geo, tile) + vec2(0.0, -46.0);
         vec2(
             at.x.clamp(geo.x + 52.0, geo.x + geo.s - 52.0),
-            at.y,
+            at.y.clamp(geo.y + 22.0, geo.y + geo.s - 26.0),
         )
     }
 
@@ -735,6 +810,8 @@ impl Watch {
             self.ready = true;
             return;
         }
+        // Fast forward keeps the show to a whisper: a turn lasts a frame there.
+        let fast = g.fast;
 
         let mut gained: Vec<usize> = Vec::new();
         let mut lost: Vec<usize> = Vec::new();
@@ -748,17 +825,21 @@ impl Watch {
                 if diff > 0 {
                     fx.float(format!("+{}", money(diff)), at, MONEY_IN, 24.0);
                     fx.coins(at, 8);
-                    fx.ring(at, MONEY_IN, 4.0, 30.0, 0.34);
+                    if !fast {
+                        fx.ring(at, MONEY_IN, 4.0, 30.0, 0.34);
+                    }
                     gained.push(i);
                 } else {
                     fx.float(format!("-{}", money(-diff)), at, MONEY_OUT, 24.0);
                     fx.spark(at, MONEY_OUT, 12);
-                    fx.streak(at, vec2(0.0, 1.0), MONEY_OUT, 6);
+                    if !fast {
+                        fx.streak(at, vec2(0.0, 1.0), MONEY_OUT, 6);
+                    }
                     lost.push(i);
                 }
             }
             // Passing GO: the corner lights up and throws gold.
-            if player.pos < was_pos && !player.bankrupt {
+            if player.pos < was_pos && !player.bankrupt && !fast {
                 let go = Watch::tile_around(geo, 0);
                 fx.ring(go, GOLD_SOFT, 8.0, 66.0, 0.5);
                 fx.rays(go, GOLD_SOFT, 8);
@@ -771,7 +852,9 @@ impl Watch {
                 fx.shake(6.0);
                 fx.ring(at, Color::new(0.85, 0.85, 0.9, 1.0), 10.0, 70.0, 0.5);
                 fx.spark(at, Color::new(0.85, 0.85, 0.9, 1.0), 20);
-                fx.rays(at, Color::new(0.80, 0.80, 0.88, 0.9), 8);
+                if !fast {
+                    fx.rays(at, Color::new(0.80, 0.80, 0.88, 0.9), 8);
+                }
                 fx.float(
                     i18n::t("Jailed!", "En prison !"),
                     Watch::label_around(geo, player.pos),
@@ -787,7 +870,9 @@ impl Watch {
                 fx.flash(Color::new(0.92, 0.18, 0.14, 1.0), 0.45);
                 fx.ring(at, MONEY_OUT, 10.0, 150.0, 0.6);
                 fx.spark(at, MONEY_OUT, 36);
-                fx.rays(at, MONEY_OUT, 14);
+                if !fast {
+                    fx.rays(at, MONEY_OUT, 14);
+                }
                 fx.float(
                     i18n::t("Bankrupt", "En faillite"),
                     Watch::label_around(geo, player.pos),
@@ -798,7 +883,7 @@ impl Watch {
         }
         // Rent reads as a transfer: the coins fly from the payer to the owner.
         if let (Some(loser), Some(winner)) = (lost.first(), gained.first()) {
-            if loser != winner {
+            if loser != winner && !fast {
                 fx.arc(
                     Watch::tile_around(geo, g.players[*loser].pos),
                     Watch::tile_around(geo, g.players[*winner].pos),
@@ -818,7 +903,9 @@ impl Watch {
             if owner != was_owner && owner.is_some() {
                 let at = Watch::tile_around(geo, t);
                 fx.burst(at, GOLD_SOFT);
-                fx.rays(at, GOLD, 6);
+                if !fast {
+                    fx.rays(at, GOLD, 6);
+                }
                 fx.shake(3.0);
             }
             let houses = g.props[t].houses;
@@ -826,7 +913,9 @@ impl Watch {
             if houses > was_houses && owner.is_some() {
                 let at = Watch::tile_around(geo, t);
                 fx.confetti(at, 12);
-                fx.ring(at, GOLD_SOFT, 6.0, 52.0, 0.45);
+                if !fast {
+                    fx.ring(at, GOLD_SOFT, 6.0, 52.0, 0.45);
+                }
                 fx.shake(3.0);
             }
             self.owner[t] = owner;
@@ -835,12 +924,14 @@ impl Watch {
 
         // The turn moving on: a ring around the token that is about to move.
         if g.turn != self.turn {
-            if let Some(player) = g.players.get(g.turn) {
-                if !player.bankrupt && g.phase != Phase::Over {
-                    let at = Watch::tile_around(geo, player.pos);
-                    fx.ring(at, GOLD_SOFT, 8.0, 54.0, 0.46);
-                    fx.stars(at, GOLD_SOFT, 6);
-                    fx.shake(1.2);
+            if !fast {
+                if let Some(player) = g.players.get(g.turn) {
+                    if !player.bankrupt && g.phase != Phase::Over {
+                        let at = Watch::tile_around(geo, player.pos);
+                        fx.ring(at, GOLD_SOFT, 8.0, 54.0, 0.46);
+                        fx.stars(at, GOLD_SOFT, 6);
+                        fx.shake(1.2);
+                    }
                 }
             }
             self.turn = g.turn;
@@ -867,7 +958,9 @@ impl Watch {
             let c = geo.center();
             let at = vec2(c.x + c.w * 0.5, c.y + c.h * 0.85);
             fx.stars(at, GOLD_SOFT, 14);
-            fx.ring(at, GOLD_SOFT, 10.0, 90.0, 0.5);
+            if !fast {
+                fx.ring(at, GOLD_SOFT, 10.0, 90.0, 0.5);
+            }
         }
         self.banner = banner;
 
@@ -884,13 +977,15 @@ impl Watch {
             if self.rain > 1.1 {
                 self.rain = 0.0;
                 fx.rain(screen_width(), 26);
-                // Fireworks over the winner's card.
-                let at = vec2(
-                    macroquad::rand::gen_range(0.14, 0.86) * screen_width(),
-                    macroquad::rand::gen_range(0.12, 0.46) * screen_height(),
-                );
-                fx.burst(at, GOLD_SOFT);
-                fx.rays(at, Color::new(0.99, 0.95, 0.84, 0.95), 12);
+                if !fast {
+                    // Fireworks over the winner's card.
+                    let at = vec2(
+                        macroquad::rand::gen_range(0.14, 0.86) * screen_width(),
+                        macroquad::rand::gen_range(0.12, 0.46) * screen_height(),
+                    );
+                    fx.burst(at, GOLD_SOFT);
+                    fx.rays(at, Color::new(0.99, 0.95, 0.84, 0.95), 12);
+                }
             }
         }
     }
@@ -1198,7 +1293,8 @@ fn draw_setup(app: &mut App) {
     let w = 830.0_f32.min(sw - 32.0);
     let h = (374.0 + app.setup.count as f32 * 54.0).min(sh - 32.0);
     let x = (sw - w) * 0.5;
-    let y = (sh - h) * 0.5;
+    // The setup card floats like the menu card, so the two screens agree.
+    let y = (sh - h) * 0.5 + (get_time() as f32 * 0.85).sin() * 2.5;
     // While the token picker is open it owns every click.
     let picker_open = app.setup.token_slot.is_some() || app.ui.load_open || app.setup.board_picker;
 
@@ -1751,6 +1847,7 @@ fn draw_play(app: &mut App) {
     let Some(g) = game.as_mut() else {
         return;
     };
+    ui.fx.set_fast(g.fast);
     let dt = get_frame_time().min(0.05);
     let lay = layout(ui.fx.offset());
     ui.watch.feed(g, &mut ui.fx, &lay.geo, dt);
@@ -4021,21 +4118,39 @@ fn draw_menu(app: &mut App) {
         3.2,
         CREAM_DIM,
     );
-    draw_line(
-        cx - sw * 0.085,
-        sh * 0.292,
-        cx + sw * 0.085,
-        sh * 0.292,
-        1.4,
-        GOLD_DIM,
-    );
+    // The rule under the title breathes out and in, like a measured beat.
+    let beat = (t * 0.55).sin() * 0.5 + 0.5;
+    let half = sw * (0.050 + 0.038 * beat);
+    draw_line(cx - half, sh * 0.292, cx + half, sh * 0.292, 1.4, GOLD_DIM);
+    for side in [-1.0, 1.0] {
+        draw_circle(cx + side * half, sh * 0.292, 2.0, GOLD_SOFT);
+    }
 
     let w = (sw * 0.34).clamp(300.0, 440.0);
     let bh = 54.0;
     let gap = 12.0;
     let card_h = 3.0 * bh + 2.0 * gap + 36.0;
     let x = cx - w * 0.5;
-    let y = sh * 0.372;
+    // The card floats over the felt on a slow breath.
+    let y = sh * 0.372 + (t * 0.85).sin() * 3.0;
+    // A lamp behind the card: a wide, soft glow that swells and fades.
+    let lamp = (t * 0.7).sin() * 0.5 + 0.5;
+    draw_ellipse(
+        cx,
+        y + card_h * 0.52,
+        w * 0.92,
+        card_h * 0.86,
+        0.0,
+        Color { r: 0.945, g: 0.835, b: 0.588, a: 0.018 + 0.020 * lamp },
+    );
+    round_rect(
+        x - 8.0,
+        y + 12.0,
+        w + 16.0,
+        card_h,
+        24.0,
+        Color { r: 0.0, g: 0.0, b: 0.0, a: 0.16 },
+    );
     round_card(x, y, w, card_h, 18.0, PANEL_BG, CARD_EDGE);
 
     let mut by = y + 18.0;
@@ -4093,24 +4208,27 @@ fn draw_menu(app: &mut App) {
         px += 2.0;
     }
 
-    // The eight tokens, bobbing like pieces waiting on the table.
+    // The eight tokens, bobbing on the table while a light passes over them.
     let step = (sw * 0.05).clamp(46.0, 66.0);
     let start = cx - step * 3.5;
+    let sway = (t * 0.45).sin() * 7.0;
+    let wave = ((t * 0.5) % 1.0) * (TOKENS.len() as f32 + 2.4) - 1.2;
     for k in 0..TOKENS.len() {
         let phase = t * 1.7 + k as f32 * 0.85;
-        let tx = start + step * k as f32;
-        let ty = y + card_h + 54.0 + phase.sin() * 5.0;
+        let near = (1.0 - (k as f32 - wave).abs() * 0.6).max(0.0);
+        let tx = start + step * k as f32 + sway;
+        let ty = y + card_h + 54.0 + phase.sin() * 5.0 - near * 7.0;
         draw_circle(
             tx,
-            ty + 9.0,
+            ty + 11.0,
             step * 0.30,
-            Color { r: 0.0, g: 0.0, b: 0.0, a: 0.20 },
+            Color { r: 0.0, g: 0.0, b: 0.0, a: 0.18 + 0.08 * near },
         );
-        let halo = 0.09 + 0.08 * (phase.cos() * 0.5 + 0.5);
+        let halo = 0.07 + 0.06 * (phase.cos() * 0.5 + 0.5) + 0.13 * near;
         draw_circle(
             tx,
             ty,
-            step * 0.37,
+            step * (0.37 + 0.09 * near),
             Color { r: TOKENS[k].r, g: TOKENS[k].g, b: TOKENS[k].b, a: halo },
         );
         tokens::draw(k, TOKENS[k], tx, ty, step * 0.30);

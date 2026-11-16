@@ -53,11 +53,14 @@ every seat be a bot and watch it play itself:
   doubles shake the table, the seat to play breathes gold, its token calls for
   attention when the turn arrives, and a won game ends under falling confetti
   with fireworks over the winner. Dialogs rise into place, buttons sparkle under
-  the cursor, and every press glitters. All of it is read back from the game
+  the cursor without any particles, and every press glitters. All of it is read back from the game
   state, so bots get the same show as a human.
-- An **animated main menu**: gold dust drifts up over the felt, the rings behind
-  the card breathe, the title carries a pulsing halo, the eight tokens float in a
-  row and a sheen runs across **NEW GAME**. It offers **NEW GAME**, **CONTINUE**
+- An **animated main menu**: the card floats on the felt over a lamp that swells
+  and fades, the rule under the title breathes, the eight tokens bob in a row
+  while a light passes along them, gold dust drifts up and a sheen runs across
+  **NEW GAME**. A button answers the cursor by moving - it slides, its edge warms
+  from dim to gold, a rule grows under its label and the word grows with it - so
+  nothing on the menu throws particles at the mouse. It offers **NEW GAME**, **CONTINUE**
   (the saved game) and the rules of the game; the language and sound switches sit
   in the corner. In game, the **MENU** button at the top of the log asks once and
   takes you back to it.
@@ -144,7 +147,10 @@ every seat be a bot and watch it play itself:
   card without leaving the window, even mid-turn.
 - **Fast forward**: the `>>>` button at the bottom of the left column resolves
   the dice, the walk and every bot decision instantly, so a table of bots plays
-  itself in seconds instead of minutes. Press it again to get the animations back.
+  itself in seconds instead of minutes. Because a turn then lasts a single frame,
+  the whole show is paced down with it: a fifth of the particles, no screen
+  shake, no flashes, no rings or fireworks, and one amount at a time instead of
+  a pile of numbers. Press it again to get the full show back.
 - **Renamable seats**: click a name on the setup screen and type - every player,
   human or bot, can be called whatever you like.
 - Animated token movement, hover tooltips on every tile, live game log.

@@ -5,7 +5,7 @@
 //! this module keeps them alive, moves them and draws them; nothing here can
 //! change the rules of the game.
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
@@ -57,6 +57,10 @@ struct Label {
 pub struct Fx {
     parts: Vec<Part>,
     labels: Vec<Label>,
+    /// How much of the full show plays: 1 normally, a fifth in fast forward.
+    scale: f32,
+    /// Earliest clock time a new floating number may appear.
+    next_label: f32,
     /// Remaining shake, in pixels, at the centre of the table.
     shake: f32,
     clock: f32,
@@ -69,11 +73,31 @@ impl Fx {
         Fx {
             parts: Vec::new(),
             labels: Vec::new(),
+            scale: 1.0,
+            next_label: 0.0,
             shake: 0.0,
             clock: 0.0,
             flash: Color::new(1.0, 1.0, 1.0, 0.0),
             flash_a: 0.0,
         }
+    }
+
+    /// Fast forward resolves turns in a single frame, so the show has to be
+    /// cheap and calm: fewer particles, no shake, no flash, fewer numbers.
+    pub fn set_fast(&mut self, fast: bool) {
+        let scale = if fast { 0.18 } else { 1.0 };
+        if (scale - self.scale).abs() > 0.01 {
+            self.scale = scale;
+        }
+        if fast {
+            self.shake = 0.0;
+            self.flash_a = 0.0;
+        }
+    }
+
+    /// How many particles an emitter may throw at the current pace.
+    fn count(&self, n: usize) -> usize {
+        ((n as f32) * self.scale).round() as usize
     }
 
     /// Forgets everything, for a fresh game.
@@ -95,6 +119,7 @@ impl Fx {
 
     /// A burst of round sparks, for something bright and small.
     pub fn spark(&mut self, at: Vec2, color: Color, n: usize) {
+        let n = self.count(n);
         for _ in 0..n {
             let a = gen_range(0.0, std::f32::consts::TAU);
             let speed = gen_range(90.0, 340.0);
@@ -118,6 +143,7 @@ impl Fx {
 
     /// Gold coins thrown up out of a tile.
     pub fn coins(&mut self, at: Vec2, n: usize) {
+        let n = self.count(n);
         for _ in 0..n {
             let life = gen_range(0.55, 0.95);
             self.push(Part {
@@ -147,6 +173,7 @@ impl Fx {
             Color::new(0.95, 0.62, 0.90, 1.0),
             Color::new(0.99, 0.98, 0.92, 1.0),
         ];
+        let n = self.count(n);
         for k in 0..n {
             let life = gen_range(1.1, 2.0);
             let a = gen_range(-std::f32::consts::PI, 0.0);
@@ -170,6 +197,7 @@ impl Fx {
 
     /// Confetti falling from the top of the screen, for the end of a game.
     pub fn rain(&mut self, width: f32, n: usize) {
+        let n = self.count(n);
         for _ in 0..n {
             let life = gen_range(2.2, 3.6);
             self.push(Part {
@@ -196,6 +224,7 @@ impl Fx {
 
     /// Four-point sparkles, used on purchases and on the banner.
     pub fn stars(&mut self, at: Vec2, color: Color, n: usize) {
+        let n = self.count(n);
         for _ in 0..n {
             let a = gen_range(0.0, std::f32::consts::TAU);
             let speed = gen_range(24.0, 160.0);
@@ -245,6 +274,7 @@ impl Fx {
             base
         };
         let angle = base.y.atan2(base.x);
+        let n = self.count(n);
         for _ in 0..n {
             let a = angle + gen_range(-0.85, 0.85);
             let speed = gen_range(340.0, 820.0);
@@ -269,6 +299,7 @@ impl Fx {
     /// Coins thrown from one place to another on an arc: rent, taxes.
     pub fn arc(&mut self, from: Vec2, to: Vec2, color: Color, n: usize) {
         let flight = 0.40;
+        let n = self.count(n);
         for _ in 0..n {
             let life = flight + gen_range(0.04, 0.22);
             let jitter = vec2(gen_range(-12.0, 12.0), gen_range(-10.0, 10.0));
@@ -296,6 +327,7 @@ impl Fx {
 
     /// Long rays around a point: a deed changing hands, a win.
     pub fn rays(&mut self, at: Vec2, color: Color, n: usize) {
+        let n = self.count(n);
         for k in 0..n {
             let a = std::f32::consts::TAU * k as f32 / n as f32 + gen_range(-0.12, 0.12);
             let speed = gen_range(100.0, 210.0);
@@ -326,11 +358,19 @@ impl Fx {
 
     /// A number that rises and fades, in the colour of what it means.
     pub fn float(&mut self, text: impl Into<String>, at: Vec2, color: Color, size: f32) {
+        // In fast forward a turn lasts a frame: numbers would pile up, so they
+        // come at a readable pace.
+        let fast = self.scale < 0.5;
+        if fast && self.clock < self.next_label {
+            return;
+        }
+        self.next_label = self.clock + if fast { 0.15 } else { 0.0 };
+        let life = if fast { 0.75 } else { 1.35 };
         self.labels.push(Label {
             text: text.into(),
             pos: at,
-            life: 1.35,
-            max: 1.35,
+            life,
+            max: life,
             color,
             size,
         });
@@ -341,12 +381,15 @@ impl Fx {
 
     /// Shakes the table. Amounts between 2 (a purchase) and 12 (a bankruptcy).
     pub fn shake(&mut self, amount: f32) {
-        self.shake = self.shake.max(amount);
+        self.shake = self.shake.max(amount * self.scale);
     }
 
     /// Tints the whole screen for a moment.
     pub fn flash(&mut self, color: Color, strength: f32) {
         self.flash = Color::new(color.r, color.g, color.b, 1.0);
+        if self.scale < 0.5 {
+            return;
+        }
         self.flash_a = self.flash_a.max(strength);
     }
 
@@ -386,7 +429,7 @@ impl Fx {
                 self.ring(at, Color::new(0.98, 0.91, 0.72, 0.95), 3.0, 36.0, 0.36);
                 self.spark(at, Color::new(0.99, 0.93, 0.75, 1.0), 10);
             } else {
-                self.stars(at, Color::new(0.98, 0.90, 0.66, 0.9), 1);
+                self.stars(at, Color::new(0.98, 0.90, 0.66, 0.9), 2);
             }
         }
     }
@@ -508,26 +551,14 @@ impl Fx {
     }
 }
 
-// Press and hover sparks asked for by the drawing code.
+// Press sparks asked for by the drawing code.
 thread_local! {
     static CLICKS: RefCell<Vec<(Vec2, bool)>> = const { RefCell::new(Vec::new()) };
-    /// When the next hover sparkle is allowed.
-    static HOVER_AT: Cell<f64> = const { Cell::new(0.0) };
 }
 
 /// A button was pressed here: a ring and a burst on the next frame.
 pub fn queue_click(at: Vec2, big: bool) {
     CLICKS.with(|q| q.borrow_mut().push((at, big)));
-}
-
-/// A button is under the cursor: now and then it throws a sparkle.
-pub fn queue_hover(at: Vec2) {
-    let now = get_time();
-    let due = HOVER_AT.with(|c| c.get());
-    if now >= due {
-        HOVER_AT.with(|c| c.set(now + 0.11));
-        CLICKS.with(|q| q.borrow_mut().push((at, false)));
-    }
 }
 
 #[cfg(test)]
@@ -560,6 +591,22 @@ mod tests {
         }
         assert_eq!(fx.offset(), (0.0, 0.0), "the table must come to rest");
         assert!(!fx.busy());
+    }
+
+    #[test]
+    fn fast_forward_thins_the_show() {
+        let mut fx = Fx::new();
+        fx.set_fast(true);
+        fx.spark(vec2(0.0, 0.0), Color::new(1.0, 1.0, 1.0, 1.0), 20);
+        assert!(fx.parts.len() <= 4, "a fast turn must stay cheap");
+        fx.shake(10.0);
+        assert!(fx.shake <= 2.5, "fast forward keeps the table still");
+        fx.flash(Color::new(1.0, 1.0, 1.0, 1.0), 0.4);
+        assert_eq!(fx.flash_a, 0.0, "no flashes in fast forward");
+        fx.clear();
+        fx.set_fast(false);
+        fx.spark(vec2(0.0, 0.0), Color::new(1.0, 1.0, 1.0, 1.0), 20);
+        assert_eq!(fx.parts.len(), 20, "the full show comes back");
     }
 
     #[test]
