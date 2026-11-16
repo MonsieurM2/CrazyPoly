@@ -5,11 +5,12 @@
 //! square board instead of leaving dead space.
 
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use macroquad::prelude::*;
 
 use crate::board::{Kind, Space};
-use crate::fx::Fx;
+use crate::fx::{self, Fx};
 use crate::game::{Game, Phase, TradeState, MAX_HOUSES};
 use crate::i18n;
 use crate::tokens;
@@ -355,6 +356,9 @@ fn felt_background() {
 fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let (mx, my) = mouse_position();
     let hover = enabled && inr(r, mx, my);
+    if hover {
+        fx::queue_hover(vec2(mx, my));
+    }
     let radius = (r.h * 0.30).min(12.0);
     let mut size = (r.h * 0.36).clamp(10.0, 16.0);
     let label = if measure(label, size, true).width > r.w - 16.0 {
@@ -401,6 +405,9 @@ fn button(r: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let clicked = enabled && hover && is_mouse_button_pressed(MouseButton::Left);
     if clicked {
         crate::audio::sfx(crate::audio::Sfx::Click);
+        if primary {
+            fx::queue_click(vec2(mx, my), true);
+        }
     }
     clicked
 }
@@ -532,10 +539,23 @@ fn sound_button(r: Rect, icon: Icon, on: bool) -> bool {
     hover && is_mouse_button_pressed(MouseButton::Left)
 }
 
+/// How much of its size the open dialog has grown into this frame.
+static MODAL_SCALE: AtomicU32 = AtomicU32::new(0x3f80_0000);
+
 fn modal_rect(w: f32, h: f32) -> Rect {
     let w = w.min(screen_width() - 24.0);
     let h = h.min(screen_height() - 24.0);
-    Rect::new((screen_width() - w) * 0.5, (screen_height() - h) * 0.5, w, h)
+    // A dialog opens slightly small and low, then settles: every panel of the
+    // game is laid out from this rectangle, so all of them rise together.
+    let grow = f32::from_bits(MODAL_SCALE.load(Ordering::Relaxed)).clamp(0.85, 1.0);
+    let w = w * grow;
+    let h = h * grow;
+    Rect::new(
+        (screen_width() - w) * 0.5,
+        (screen_height() - h) * 0.5 + (1.0 - grow) * 140.0,
+        w,
+        h,
+    )
 }
 
 fn modal_shell(r: Rect, title: &str) -> Rect {
@@ -601,6 +621,10 @@ pub struct Ui {
     /// Last auction bid drawn, and how long ago it changed.
     pub bid_seen: i64,
     pub bid_age: f32,
+    /// Which dialog is open, and how long it has been open, so a dialog can
+    /// rise into place instead of appearing.
+    modal_now: Modal,
+    modal_age: f32,
 }
 
 impl Ui {
@@ -626,6 +650,8 @@ impl Ui {
             watch: Watch::new(),
             bid_seen: -1,
             bid_age: 10.0,
+            modal_now: Modal::None,
+            modal_age: 10.0,
         }
     }
 }
@@ -646,10 +672,13 @@ pub struct Watch {
     houses: Vec<u8>,
     jailed: Vec<bool>,
     bankrupt: Vec<bool>,
+    turn: usize,
     banner: f32,
     over: bool,
     rain: f32,
     dice_anim: f32,
+    /// Tile each player stood on last frame, to spot a pass over GO.
+    pos: Vec<usize>,
 }
 
 impl Watch {
@@ -661,10 +690,12 @@ impl Watch {
             houses: Vec::new(),
             jailed: Vec::new(),
             bankrupt: Vec::new(),
+            turn: usize::MAX,
             banner: 0.0,
             over: false,
             rain: 0.0,
             dice_anim: 0.0,
+            pos: Vec::new(),
         }
     }
 
@@ -678,6 +709,16 @@ impl Watch {
         vec2(r.x + r.w * 0.5, r.y + r.h * 0.5)
     }
 
+    /// Where a floating word about a tile goes: just above it, kept inside the
+    /// board so it never runs over the side panels.
+    fn label_around(geo: &Geo, tile: usize) -> Vec2 {
+        let at = Watch::tile_around(geo, tile) + vec2(0.0, -46.0);
+        vec2(
+            at.x.clamp(geo.x + 52.0, geo.x + geo.s - 52.0),
+            at.y,
+        )
+    }
+
     fn feed(&mut self, g: &Game, fx: &mut Fx, geo: &Geo, dt: f32) {
         let n = g.players.len();
         if !self.ready {
@@ -686,51 +727,88 @@ impl Watch {
             self.houses = g.props.iter().map(|p| p.houses).collect();
             self.jailed = g.players.iter().map(|p| p.in_jail).collect();
             self.bankrupt = g.players.iter().map(|p| p.bankrupt).collect();
+            self.turn = g.turn;
             self.banner = g.banner.as_ref().map(|b| b.1).unwrap_or(0.0);
             self.over = g.phase == Phase::Over;
             self.dice_anim = g.dice_anim;
+            self.pos = g.players.iter().map(|p| p.pos).collect();
             self.ready = true;
             return;
         }
 
+        let mut gained: Vec<usize> = Vec::new();
+        let mut lost: Vec<usize> = Vec::new();
         for i in 0..n {
             let player = &g.players[i];
+            let was_pos = self.pos.get(i).copied().unwrap_or(player.pos);
             let was_cash = self.cash.get(i).copied().unwrap_or(player.cash);
             let diff = player.cash - was_cash;
             if diff != 0 && !player.bankrupt {
-                let at = Watch::tile_around(geo, player.pos) + vec2(0.0, -10.0);
+                let at = Watch::label_around(geo, player.pos);
                 if diff > 0 {
-                    fx.float(format!("+{}", money(diff)), at, MONEY_IN, 15.0);
-                    fx.coins(at, 4);
+                    fx.float(format!("+{}", money(diff)), at, MONEY_IN, 24.0);
+                    fx.coins(at, 8);
+                    fx.ring(at, MONEY_IN, 4.0, 30.0, 0.34);
+                    gained.push(i);
                 } else {
-                    fx.float(format!("-{}", money(-diff)), at, MONEY_OUT, 15.0);
-                    fx.spark(at, MONEY_OUT, 7);
+                    fx.float(format!("-{}", money(-diff)), at, MONEY_OUT, 24.0);
+                    fx.spark(at, MONEY_OUT, 12);
+                    fx.streak(at, vec2(0.0, 1.0), MONEY_OUT, 6);
+                    lost.push(i);
                 }
+            }
+            // Passing GO: the corner lights up and throws gold.
+            if player.pos < was_pos && !player.bankrupt {
+                let go = Watch::tile_around(geo, 0);
+                fx.ring(go, GOLD_SOFT, 8.0, 66.0, 0.5);
+                fx.rays(go, GOLD_SOFT, 8);
+                fx.coins(go, 5);
             }
 
             let was_jail = self.jailed.get(i).copied().unwrap_or(false);
             if player.in_jail && !was_jail {
                 let at = Watch::tile_around(geo, player.pos);
-                fx.shake(5.0);
-                fx.spark(at, Color::new(0.85, 0.85, 0.9, 1.0), 12);
-                fx.float(i18n::t("Jailed!", "En prison !"), at, WARN, 16.0);
+                fx.shake(6.0);
+                fx.ring(at, Color::new(0.85, 0.85, 0.9, 1.0), 10.0, 70.0, 0.5);
+                fx.spark(at, Color::new(0.85, 0.85, 0.9, 1.0), 20);
+                fx.rays(at, Color::new(0.80, 0.80, 0.88, 0.9), 8);
+                fx.float(
+                    i18n::t("Jailed!", "En prison !"),
+                    Watch::label_around(geo, player.pos),
+                    WARN,
+                    19.0,
+                );
             }
 
             let was_out = self.bankrupt.get(i).copied().unwrap_or(false);
             if player.bankrupt && !was_out {
                 let at = Watch::tile_around(geo, player.pos);
-                fx.shake(11.0);
-                fx.flash(Color::new(0.92, 0.18, 0.14, 1.0), 0.42);
-                fx.spark(at, MONEY_OUT, 26);
+                fx.shake(13.0);
+                fx.flash(Color::new(0.92, 0.18, 0.14, 1.0), 0.45);
+                fx.ring(at, MONEY_OUT, 10.0, 150.0, 0.6);
+                fx.spark(at, MONEY_OUT, 36);
+                fx.rays(at, MONEY_OUT, 14);
                 fx.float(
                     i18n::t("Bankrupt", "En faillite"),
-                    at,
+                    Watch::label_around(geo, player.pos),
                     MONEY_OUT,
-                    17.0,
+                    22.0,
+                );
+            }
+        }
+        // Rent reads as a transfer: the coins fly from the payer to the owner.
+        if let (Some(loser), Some(winner)) = (lost.first(), gained.first()) {
+            if loser != winner {
+                fx.arc(
+                    Watch::tile_around(geo, g.players[*loser].pos),
+                    Watch::tile_around(geo, g.players[*winner].pos),
+                    Color::new(0.98, 0.82, 0.36, 0.95),
+                    10,
                 );
             }
         }
         self.cash = g.players.iter().map(|p| p.cash).collect();
+        self.pos = g.players.iter().map(|p| p.pos).collect();
         self.jailed = g.players.iter().map(|p| p.in_jail).collect();
         self.bankrupt = g.players.iter().map(|p| p.bankrupt).collect();
 
@@ -739,29 +817,47 @@ impl Watch {
             let was_owner = self.owner.get(t).copied().flatten();
             if owner != was_owner && owner.is_some() {
                 let at = Watch::tile_around(geo, t);
-                fx.stars(at, GOLD_SOFT, 7);
-                fx.spark(at, GOLD, 9);
-                fx.shake(2.0);
+                fx.burst(at, GOLD_SOFT);
+                fx.rays(at, GOLD, 6);
+                fx.shake(3.0);
             }
             let houses = g.props[t].houses;
             let was_houses = self.houses.get(t).copied().unwrap_or(houses);
             if houses > was_houses && owner.is_some() {
                 let at = Watch::tile_around(geo, t);
-                fx.confetti(at, 7);
-                fx.shake(2.5);
+                fx.confetti(at, 12);
+                fx.ring(at, GOLD_SOFT, 6.0, 52.0, 0.45);
+                fx.shake(3.0);
             }
             self.owner[t] = owner;
             self.houses[t] = houses;
         }
 
+        // The turn moving on: a ring around the token that is about to move.
+        if g.turn != self.turn {
+            if let Some(player) = g.players.get(g.turn) {
+                if !player.bankrupt && g.phase != Phase::Over {
+                    let at = Watch::tile_around(geo, player.pos);
+                    fx.ring(at, GOLD_SOFT, 8.0, 54.0, 0.46);
+                    fx.stars(at, GOLD_SOFT, 6);
+                    fx.shake(1.2);
+                }
+            }
+            self.turn = g.turn;
+        }
+
         // Dice leaving the hand, and dice landing.
+        let c = geo.center();
+        let dice = vec2(c.x + c.w * 0.5, c.y + c.h * 0.455);
         if g.dice_anim > 0.0 && self.dice_anim <= 0.0 {
-            fx.shake(2.6);
+            fx.shake(3.2);
+            fx.streak(dice, vec2(0.0, -1.0), Color::new(0.99, 0.94, 0.80, 1.0), 12);
         }
         if g.dice_anim <= 0.0 && self.dice_anim > 0.0 {
-            let c = geo.center();
-            let at = vec2(c.x + c.w * 0.5, c.y + c.h * 0.455);
-            fx.spark(at, Color::new(0.98, 0.92, 0.75, 1.0), 9);
+            fx.burst(dice, Color::new(0.98, 0.92, 0.75, 1.0));
+            fx.ring(dice, Color::new(0.99, 0.95, 0.82, 0.95), 12.0, 96.0, 0.45);
+            fx.streak(dice, vec2(0.0, 1.0), Color::new(0.99, 0.94, 0.80, 1.0), 10);
+            fx.shake(4.0);
         }
         self.dice_anim = g.dice_anim;
 
@@ -769,7 +865,9 @@ impl Watch {
         let banner = g.banner.as_ref().map(|b| b.1).unwrap_or(0.0);
         if banner > self.banner + 0.4 {
             let c = geo.center();
-            fx.stars(vec2(c.x + c.w * 0.5, c.y + c.h * 0.85), GOLD_SOFT, 9);
+            let at = vec2(c.x + c.w * 0.5, c.y + c.h * 0.85);
+            fx.stars(at, GOLD_SOFT, 14);
+            fx.ring(at, GOLD_SOFT, 10.0, 90.0, 0.5);
         }
         self.banner = banner;
 
@@ -783,9 +881,16 @@ impl Watch {
         self.over = g.phase == Phase::Over;
         if self.over {
             self.rain += dt;
-            if self.rain > 1.6 {
+            if self.rain > 1.1 {
                 self.rain = 0.0;
-                fx.rain(screen_width(), 28);
+                fx.rain(screen_width(), 26);
+                // Fireworks over the winner's card.
+                let at = vec2(
+                    macroquad::rand::gen_range(0.14, 0.86) * screen_width(),
+                    macroquad::rand::gen_range(0.12, 0.46) * screen_height(),
+                );
+                fx.burst(at, GOLD_SOFT);
+                fx.rays(at, Color::new(0.99, 0.95, 0.84, 0.95), 12);
             }
         }
     }
@@ -914,10 +1019,22 @@ pub fn frame(app: &mut App) {
             }
         }
     }
+    // Any press anywhere glitters at the cursor, and the effects advance once
+    // per frame for every screen.
+    if is_mouse_button_pressed(MouseButton::Left) {
+        let (mx, my) = mouse_position();
+        fx::queue_click(vec2(mx, my), false);
+    }
+    app.ui.fx.update(get_frame_time().min(0.05));
     match app.screen {
         Screen::Menu => draw_menu(app),
         Screen::Setup => draw_setup(app),
         Screen::Play => draw_play(app),
+    }
+    if app.screen != Screen::Play {
+        MODAL_SCALE.store(1.0f32.to_bits(), Ordering::Relaxed);
+        app.ui.fx.draw();
+        app.ui.fx.draw_flash();
     }
 }
 
@@ -1635,12 +1752,21 @@ fn draw_play(app: &mut App) {
         return;
     };
     let dt = get_frame_time().min(0.05);
-    ui.fx.update(dt);
     let lay = layout(ui.fx.offset());
     ui.watch.feed(g, &mut ui.fx, &lay.geo, dt);
     let (mx, my) = mouse_position();
     let modal = active_modal(g, ui);
     let input = modal == Modal::None;
+    // A new dialog grows into place over a fifth of a second.
+    if modal != ui.modal_now {
+        ui.modal_now = modal;
+        ui.modal_age = 0.0;
+    } else {
+        ui.modal_age += dt;
+    }
+    let grow = (ui.modal_age / 0.20).min(1.0);
+    let grow = 1.0 - (1.0 - grow).powi(3);
+    MODAL_SCALE.store((0.93 + 0.07 * grow).to_bits(), Ordering::Relaxed);
 
     felt_background();
     // A tile under the cursor shows its own deed; the card of the space on
@@ -1654,7 +1780,17 @@ fn draw_play(app: &mut App) {
     }
     // Sparks, coins and confetti sit above the table, under the dialogs.
     ui.fx.draw();
-    ui.fx.draw_labels(|text, x, y, size, color| txt_bold(text, x, y, size, color));
+    ui.fx.draw_labels(|text, x, y, size, color| {
+        // A soft shadow keeps a number readable over the busy board.
+        centered_bold(
+            text,
+            x + 1.5,
+            y + 1.5,
+            size,
+            Color::new(0.02, 0.05, 0.03, 0.55 * color.a),
+        );
+        centered_bold(text, x, y, size, color);
+    });
 
     let mut again = false;
     match modal {
@@ -2767,7 +2903,7 @@ fn draw_deed_card(g: &Game, lay: &Layout) {
         g,
         tile,
         geo.x + geo.s * 0.105,
-        geo.y + geo.s * 0.195,
+        geo.y + geo.s * 0.195 + (get_time() as f32 * 2.0).sin() * 4.0,
         (geo.s * 0.31).max(150.0),
         (geo.s * 0.40).max(180.0),
     );
@@ -2936,8 +3072,10 @@ fn draw_auction(g: &mut Game, ui: &mut Ui) {
     if bid != ui.bid_seen {
         if bid > ui.bid_seen {
             let r = modal_rect(600.0, 550.0);
-            ui.fx
-                .spark(vec2(r.x + r.w * 0.5, r.y + 176.0), GOLD_SOFT, 8);
+            let at = vec2(r.x + r.w * 0.5, r.y + 176.0);
+            ui.fx.spark(at, GOLD_SOFT, 10);
+            ui.fx.coins(at, 4);
+            ui.fx.ring(at, GOLD_SOFT, 6.0, 40.0, 0.36);
         }
         ui.bid_seen = bid;
         ui.bid_age = 0.0;

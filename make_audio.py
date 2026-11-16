@@ -74,6 +74,43 @@ def noise_burst(buf, start, dur, amp, low=0.0, high=1.0, decay=0.05):
         buf[idx] += v * amp * math.exp(-k / (decay * SR))
 
 
+
+def swept(buf, start, dur, f0, f1, amp, attack=0.006, decay=0.06,
+          partials=((1.0, 1.0),)):
+    """A gliding tone with a rounded attack: no hard edge, still an impact."""
+    i0 = int(start * SR)
+    n = int(dur * SR)
+    ph = 0.0
+    for k in range(n):
+        idx = i0 + k
+        if idx >= len(buf):
+            break
+        t = k / SR
+        f = f0 * (f1 / f0) ** min(1.0, t / dur)
+        ph += 2 * math.pi * f / SR
+        a = 0.5 - 0.5 * math.cos(math.pi * min(1.0, t / attack)) if attack > 0 else 1.0
+        e = a * math.exp(-t / decay)
+        v = 0.0
+        for mult, gain in partials:
+            v += gain * math.sin(ph * mult)
+        buf[idx] += v * e * amp
+
+
+def noise_soft(buf, start, dur, amp, lowpass=0.1, attack=0.008, decay=0.05):
+    """Low-passed noise that swells in and dies away: felt, not a click."""
+    i0 = int(start * SR)
+    n = int(dur * SR)
+    lp = 0.0
+    for k in range(n):
+        idx = i0 + k
+        if idx >= len(buf):
+            break
+        t = k / SR
+        lp += (random.uniform(-1.0, 1.0) - lp) * lowpass
+        a = 0.5 - 0.5 * math.cos(math.pi * min(1.0, t / attack)) if attack > 0 else 1.0
+        buf[idx] += lp * amp * a * math.exp(-t / decay)
+
+
 def reverb(buf, wet=0.28):
     combs = [(1557, 0.79), (1617, 0.77), (1491, 0.74), (1277, 0.72)]
     acc = [0.0] * (len(buf) + 20000)
@@ -209,10 +246,22 @@ def sfx_dice():
     return buf
 
 
-def sfx_step():
-    buf = [0.0] * int(0.12 * SR)
-    tone(buf, 0.0, 0.1, 420.0, 0.30, partials=((1.0, 1.0), (2.0, 0.2)), attack=0.002, decay=0.03)
-    noise_burst(buf, 0.0, 0.05, 0.10, high=0.5, decay=0.01)
+def sfx_step(seed, pitch=210.0):
+    """A piece set down on felt: a soft body that settles, a wooden tock and a
+    breath of felt, all rounded at the attack so the step never clicks."""
+    state = random.getstate()
+    random.seed(seed)
+    buf = [0.0] * int(0.30 * SR)
+    # The weight of the piece landing, gliding down as the felt takes it.
+    swept(buf, 0.0, 0.26, pitch, pitch * 0.60, 0.60,
+          attack=0.007, decay=0.075, partials=((1.0, 1.0), (2.0, 0.16)))
+    # A small wooden tock, an octave and a half up, very round.
+    swept(buf, 0.006, 0.17, pitch * 2.7, pitch * 2.25, 0.15,
+          attack=0.011, decay=0.038, partials=((1.0, 1.0), (3.0, 0.10)))
+    # The felt itself: a quiet swell of noise, gone before it is heard.
+    noise_soft(buf, 0.0, 0.20, 0.26, lowpass=0.09, attack=0.009, decay=0.048)
+    reverb(buf, 0.13)
+    random.setstate(state)
     return buf
 
 
@@ -295,7 +344,9 @@ if __name__ == "__main__":
     write("music.wav", music(), peak=0.62)
     write("click.wav", sfx_click(), peak=0.55)
     write("dice.wav", sfx_dice(), peak=0.70)
-    write("step.wav", sfx_step(), peak=0.35)
+    write("step.wav", sfx_step(21, 210.0), peak=0.42)
+    write("step2.wav", sfx_step(47, 196.0), peak=0.42)
+    write("step3.wav", sfx_step(83, 226.0), peak=0.42)
     write("cash.wav", sfx_cash(), peak=0.60)
     write("buy.wav", sfx_buy(), peak=0.62)
     write("card.wav", sfx_card(), peak=0.50)

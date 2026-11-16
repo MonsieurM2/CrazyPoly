@@ -17,6 +17,8 @@ const MUSIC: &[u8] = include_bytes!("../assets/audio/music.wav");
 const CLICK: &[u8] = include_bytes!("../assets/audio/click.wav");
 const DICE: &[u8] = include_bytes!("../assets/audio/dice.wav");
 const STEP: &[u8] = include_bytes!("../assets/audio/step.wav");
+const STEP2: &[u8] = include_bytes!("../assets/audio/step2.wav");
+const STEP3: &[u8] = include_bytes!("../assets/audio/step3.wav");
 const CASH: &[u8] = include_bytes!("../assets/audio/cash.wav");
 const BUY: &[u8] = include_bytes!("../assets/audio/buy.wav");
 const CARD: &[u8] = include_bytes!("../assets/audio/card.wav");
@@ -58,6 +60,10 @@ struct Bank {
     click: Sound,
     dice: Sound,
     step: Sound,
+    step2: Sound,
+    step3: Sound,
+    /// Which of the three steps plays next, so a walk is not a loop.
+    step_turn: u8,
     cash: Sound,
     buy: Sound,
     card: Sound,
@@ -90,6 +96,9 @@ pub async fn load() {
         click: snd!(CLICK),
         dice: snd!(DICE),
         step: snd!(STEP),
+        step2: snd!(STEP2),
+        step3: snd!(STEP3),
+        step_turn: 0,
         cash: snd!(CASH),
         buy: snd!(BUY),
         card: snd!(CARD),
@@ -117,8 +126,8 @@ fn start_music(bank: &Bank) {
 /// Play one effect, unless audio is unavailable or the effects are muted.
 pub fn sfx(kind: Sfx) {
     BANK.with(|cell| {
-        let cell = cell.borrow();
-        let Some(bank) = cell.as_ref() else {
+        let mut cell = cell.borrow_mut();
+        let Some(bank) = cell.as_mut() else {
             return;
         };
         if !bank.sfx_on {
@@ -127,7 +136,16 @@ pub fn sfx(kind: Sfx) {
         let sound = match kind {
             Sfx::Click => &bank.click,
             Sfx::Dice => &bank.dice,
-            Sfx::Step => &bank.step,
+            // Three pitches, taken in turn: a walk taps rather than ticks.
+            Sfx::Step => {
+                let turn = bank.step_turn.wrapping_add(1);
+                bank.step_turn = turn;
+                match turn % 3 {
+                    1 => &bank.step2,
+                    2 => &bank.step3,
+                    _ => &bank.step,
+                }
+            }
             Sfx::Cash => &bank.cash,
             Sfx::Buy => &bank.buy,
             Sfx::Card => &bank.card,

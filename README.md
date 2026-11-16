@@ -43,12 +43,18 @@ every seat be a bot and watch it play itself:
   chest for Community Chest, a barred cell for the jail, a park with its tree
   and its bench for Free Parking, and a little red car for GO.
 - **Feel**: every event answers on screen. Money floats up over the tile that
-  moved it - gold coins when it comes in, a red spark when it goes out - a lot
-  changing hands throws sparkles, a new house bursts confetti, a drawn card
-  slides in and glitters, doubles shake the table, a bankruptcy flashes it red,
-  the seat to play breathes gold, the token of the player to move rises and
-  falls, and a game won ends under falling confetti. Every effect is read back
-  from the game state, so bots get the same show as a human.
+  moved it - gold coins and a ring when it comes in, a red burst and streaks
+  when it goes out - and rent sends a line of coins flying from the payer to the
+  owner. A lot changing hands throws a ring, sparkles and rays; a new house
+  bursts confetti; the dice land in a shockwave of streaks and a ring, and the
+  throw itself kicks the table. Passing GO lights the corner and throws gold, a
+  jailing rings out in silver, a bankruptcy shakes the whole table, flashes it
+  red and throws thirty sparks. A drawn card slides in, settles and glitters,
+  doubles shake the table, the seat to play breathes gold, its token calls for
+  attention when the turn arrives, and a won game ends under falling confetti
+  with fireworks over the winner. Dialogs rise into place, buttons sparkle under
+  the cursor, and every press glitters. All of it is read back from the game
+  state, so bots get the same show as a human.
 - An **animated main menu**: gold dust drifts up over the felt, the rings behind
   the card breathe, the title carries a pulsing halo, the eight tokens float in a
   row and a sheen runs across **NEW GAME**. It offers **NEW GAME**, **CONTINUE**
@@ -121,7 +127,8 @@ every seat be a bot and watch it play itself:
   drawn with primitives - pick one for each seat on the setup screen.
 - **Music and sound effects**, all original and royalty-free: a laid-back
   salon loop (electric piano, bass, brushed ride, small room reverb) under the
-  whole game, plus dice tumbling, a step per space, coins, a purchase chord, a
+  whole game, plus dice tumbling, a soft wooden step per space (three pitches,
+  so a walk never sounds like a loop), coins, a purchase chord, a
   card swoosh, the jail clank, a hammer for houses, a low buzz for debts and a
   short fanfare when someone wins. Two icon buttons - an equaliser for the
   effects and a note for the music - turn either channel off at any time, on the
@@ -218,11 +225,15 @@ Eight token designs, drawn with primitives:
 
 ## Sound
 
-The music and the eleven effects are **original**: `make_audio.py` renders them
+The music and the twelve effects are **original**: `make_audio.py` renders them
 from sines, filtered noise and a small Schroeder reverb, so nothing here is
 borrowed and there is no licence to check. The WAVs are compiled into the
 executable with `include_bytes!`, so the game still ships as a single file.
 
+- The step is the quiet hero of the set: a body that glides down as the felt
+  takes the weight, a rounded wooden tock, and a breath of low-passed noise.
+  Every edge is faded in over a few milliseconds, which is what keeps a step
+  from clicking, while the glide keeps the impact.
 - The loop starts on the setup screen and runs through the whole game.
 - The note button mutes the music, the equaliser button mutes the effects; both
   icons are struck through when their channel is off.

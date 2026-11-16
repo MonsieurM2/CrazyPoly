@@ -5,6 +5,8 @@
 //! this module keeps them alive, moves them and draws them; nothing here can
 //! change the rules of the game.
 
+use std::cell::{Cell, RefCell};
+
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
 
@@ -21,6 +23,10 @@ enum Shape {
     Confetti,
     /// A four-point sparkle.
     Star,
+    /// An expanding ring of light.
+    Ring,
+    /// A short streak along a fast path.
+    Ray,
 }
 
 struct Part {
@@ -29,6 +35,8 @@ struct Part {
     life: f32,
     max: f32,
     size: f32,
+    /// Radius gained per second, for rings.
+    grow: f32,
     color: Color,
     gravity: f32,
     drag: f32,
@@ -89,14 +97,15 @@ impl Fx {
     pub fn spark(&mut self, at: Vec2, color: Color, n: usize) {
         for _ in 0..n {
             let a = gen_range(0.0, std::f32::consts::TAU);
-            let speed = gen_range(60.0, 240.0);
-            let life = gen_range(0.30, 0.65);
+            let speed = gen_range(90.0, 340.0);
+            let life = gen_range(0.34, 0.72);
             self.push(Part {
                 pos: at,
-                vel: vec2(a.cos() * speed, a.sin() * speed - 40.0),
+                vel: vec2(a.cos() * speed, a.sin() * speed - 50.0),
                 life,
                 max: life,
-                size: gen_range(1.6, 3.6),
+                size: gen_range(2.2, 5.0),
+                grow: 0.0,
                 color,
                 gravity: 220.0,
                 drag: 0.10,
@@ -113,10 +122,11 @@ impl Fx {
             let life = gen_range(0.55, 0.95);
             self.push(Part {
                 pos: at + vec2(gen_range(-14.0, 14.0), gen_range(-6.0, 6.0)),
-                vel: vec2(gen_range(-70.0, 70.0), gen_range(-320.0, -190.0)),
+                vel: vec2(gen_range(-110.0, 110.0), gen_range(-400.0, -230.0)),
                 life,
                 max: life,
-                size: gen_range(4.0, 7.0),
+                size: gen_range(4.5, 8.5),
+                grow: 0.0,
                 color: Color::new(0.98, 0.82, 0.36, 1.0),
                 gravity: 760.0,
                 drag: 0.02,
@@ -146,7 +156,8 @@ impl Fx {
                 vel: vec2(a.cos() * speed, a.sin() * speed - 60.0),
                 life,
                 max: life,
-                size: gen_range(3.5, 7.5),
+                size: gen_range(4.5, 9.5),
+                grow: 0.0,
                 color: COLORS[k % COLORS.len()],
                 gravity: 420.0,
                 drag: 0.55,
@@ -166,7 +177,8 @@ impl Fx {
                 vel: vec2(gen_range(-40.0, 40.0), gen_range(60.0, 170.0)),
                 life,
                 max: life,
-                size: gen_range(4.0, 8.0),
+                size: gen_range(5.0, 10.0),
+                grow: 0.0,
                 color: Color::new(
                     gen_range(0.35, 1.0),
                     gen_range(0.35, 1.0),
@@ -186,14 +198,15 @@ impl Fx {
     pub fn stars(&mut self, at: Vec2, color: Color, n: usize) {
         for _ in 0..n {
             let a = gen_range(0.0, std::f32::consts::TAU);
-            let speed = gen_range(20.0, 130.0);
-            let life = gen_range(0.5, 0.9);
+            let speed = gen_range(24.0, 160.0);
+            let life = gen_range(0.55, 1.0);
             self.push(Part {
-                pos: at + vec2(gen_range(-24.0, 24.0), gen_range(-16.0, 16.0)),
+                pos: at + vec2(gen_range(-28.0, 28.0), gen_range(-20.0, 20.0)),
                 vel: vec2(a.cos() * speed, a.sin() * speed),
                 life,
                 max: life,
-                size: gen_range(4.0, 9.0),
+                size: gen_range(5.0, 11.0),
+                grow: 0.0,
                 color,
                 gravity: 0.0,
                 drag: 0.02,
@@ -202,6 +215,113 @@ impl Fx {
                 spin_v: gen_range(-3.0, 3.0),
             });
         }
+    }
+
+    /// An expanding ring, for an impact that needs weight.
+    pub fn ring(&mut self, at: Vec2, color: Color, from: f32, to: f32, life: f32) {
+        let life = life.max(0.12);
+        self.push(Part {
+            pos: at,
+            vel: vec2(0.0, 0.0),
+            life,
+            max: life,
+            size: from,
+            grow: (to - from) / life,
+            color,
+            gravity: 0.0,
+            drag: 0.0,
+            shape: Shape::Ring,
+            spin: 0.0,
+            spin_v: 0.0,
+        });
+    }
+
+    /// Fast streaks thrown one way: dice, a slam, a spin.
+    pub fn streak(&mut self, at: Vec2, dir: Vec2, color: Color, n: usize) {
+        let base = dir.normalize_or_zero();
+        let base = if base.length_squared() < 0.01 {
+            vec2(0.0, -1.0)
+        } else {
+            base
+        };
+        let angle = base.y.atan2(base.x);
+        for _ in 0..n {
+            let a = angle + gen_range(-0.85, 0.85);
+            let speed = gen_range(340.0, 820.0);
+            let life = gen_range(0.14, 0.32);
+            self.push(Part {
+                pos: at + vec2(gen_range(-10.0, 10.0), gen_range(-10.0, 10.0)),
+                vel: vec2(a.cos() * speed, a.sin() * speed),
+                life,
+                max: life,
+                size: gen_range(1.8, 3.4),
+                grow: 0.0,
+                color,
+                gravity: 140.0,
+                drag: 2.6,
+                shape: Shape::Ray,
+                spin: 0.0,
+                spin_v: 0.0,
+            });
+        }
+    }
+
+    /// Coins thrown from one place to another on an arc: rent, taxes.
+    pub fn arc(&mut self, from: Vec2, to: Vec2, color: Color, n: usize) {
+        let flight = 0.40;
+        for _ in 0..n {
+            let life = flight + gen_range(0.04, 0.22);
+            let jitter = vec2(gen_range(-12.0, 12.0), gen_range(-10.0, 10.0));
+            let start = from + jitter;
+            let end = to + jitter;
+            // A parabola that lands exactly on the receiver.
+            let vx = (end.x - start.x) / flight;
+            let vy = (end.y - start.y) / flight - 0.5 * 900.0 * flight;
+            self.push(Part {
+                pos: start,
+                vel: vec2(vx, vy),
+                life,
+                max: life,
+                size: gen_range(3.5, 6.5),
+                grow: 0.0,
+                color,
+                gravity: 900.0,
+                drag: 0.0,
+                shape: Shape::Coin,
+                spin: gen_range(0.0, 6.0),
+                spin_v: gen_range(-9.0, 9.0),
+            });
+        }
+    }
+
+    /// Long rays around a point: a deed changing hands, a win.
+    pub fn rays(&mut self, at: Vec2, color: Color, n: usize) {
+        for k in 0..n {
+            let a = std::f32::consts::TAU * k as f32 / n as f32 + gen_range(-0.12, 0.12);
+            let speed = gen_range(100.0, 210.0);
+            let life = gen_range(0.34, 0.58);
+            self.push(Part {
+                pos: at,
+                vel: vec2(a.cos() * speed, a.sin() * speed),
+                life,
+                max: life,
+                size: gen_range(2.0, 3.6),
+                grow: 0.0,
+                color,
+                gravity: 0.0,
+                drag: 1.6,
+                shape: Shape::Ray,
+                spin: 0.0,
+                spin_v: 0.0,
+            });
+        }
+    }
+
+    /// The full reply to something landing or changing hands.
+    pub fn burst(&mut self, at: Vec2, color: Color) {
+        self.ring(at, color, 6.0, 48.0, 0.42);
+        self.stars(at, color, 9);
+        self.spark(at, color, 14);
     }
 
     /// A number that rises and fades, in the colour of what it means.
@@ -243,6 +363,7 @@ impl Fx {
 
         for p in self.parts.iter_mut() {
             p.life -= dt;
+            p.size += p.grow * dt;
             p.vel.y += p.gravity * dt;
             let damp = (1.0 - p.drag * dt).clamp(0.0, 1.0);
             p.vel *= damp;
@@ -256,6 +377,18 @@ impl Fx {
             l.pos.y -= 34.0 * dt;
         }
         self.labels.retain(|l| l.life > 0.0);
+
+        // Presses and hovers ask for their spark from inside the drawing code;
+        // they are collected here, so any button anywhere can light up.
+        let queued: Vec<(Vec2, bool)> = CLICKS.with(|q| q.borrow_mut().drain(..).collect());
+        for (at, big) in queued {
+            if big {
+                self.ring(at, Color::new(0.98, 0.91, 0.72, 0.95), 3.0, 36.0, 0.36);
+                self.spark(at, Color::new(0.99, 0.93, 0.75, 1.0), 10);
+            } else {
+                self.stars(at, Color::new(0.98, 0.90, 0.66, 0.9), 1);
+            }
+        }
     }
 
     /// How far the table is displaced this frame.
@@ -321,6 +454,15 @@ impl Fx {
                         },
                     );
                 }
+                Shape::Ring => {
+                    let c = Color::new(p.color.r, p.color.g, p.color.b, p.color.a * fade * 0.85);
+                    draw_circle_lines(p.pos.x, p.pos.y, p.size, 2.8 * fade.max(0.3), c);
+                }
+                Shape::Ray => {
+                    let c = Color::new(p.color.r, p.color.g, p.color.b, p.color.a * fade);
+                    let tail = p.pos - p.vel * 0.045;
+                    draw_line(p.pos.x, p.pos.y, tail.x, tail.y, p.size, c);
+                }
                 Shape::Star => {
                     let r = p.size * (0.3 + 0.7 * k);
                     let c = Color::new(p.color.r, p.color.g, p.color.b, p.color.a * fade);
@@ -334,7 +476,7 @@ impl Fx {
     }
 
     /// Draws the floating numbers with the game's own font, on top of the
-    /// particles: `text` prints a string at its baseline.
+    /// particles: `text` prints a string centred on the point.
     pub fn draw_labels<F: Fn(&str, f32, f32, f32, Color)>(&self, text: F) {
         for l in &self.labels {
             let k = l.life / l.max;
@@ -346,7 +488,7 @@ impl Fx {
                 1.0
             };
             let c = Color::new(l.color.r, l.color.g, l.color.b, l.color.a * fade);
-            text(&l.text, l.pos.x - 0.5, l.pos.y, l.size * pop, c);
+            text(&l.text, l.pos.x, l.pos.y, l.size * pop, c);
         }
     }
 
@@ -363,6 +505,28 @@ impl Fx {
             screen_height(),
             Color::new(self.flash.r, self.flash.g, self.flash.b, self.flash_a.min(0.5)),
         );
+    }
+}
+
+// Press and hover sparks asked for by the drawing code.
+thread_local! {
+    static CLICKS: RefCell<Vec<(Vec2, bool)>> = const { RefCell::new(Vec::new()) };
+    /// When the next hover sparkle is allowed.
+    static HOVER_AT: Cell<f64> = const { Cell::new(0.0) };
+}
+
+/// A button was pressed here: a ring and a burst on the next frame.
+pub fn queue_click(at: Vec2, big: bool) {
+    CLICKS.with(|q| q.borrow_mut().push((at, big)));
+}
+
+/// A button is under the cursor: now and then it throws a sparkle.
+pub fn queue_hover(at: Vec2) {
+    let now = get_time();
+    let due = HOVER_AT.with(|c| c.get());
+    if now >= due {
+        HOVER_AT.with(|c| c.set(now + 0.11));
+        CLICKS.with(|q| q.borrow_mut().push((at, false)));
     }
 }
 
