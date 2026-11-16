@@ -49,18 +49,19 @@ every seat be a bot and watch it play itself:
   bursts confetti; the dice land in a shockwave of streaks and a ring, and the
   throw itself kicks the table. Passing GO lights the corner and throws gold, a
   jailing rings out in silver, a bankruptcy shakes the whole table, flashes it
-  red and throws thirty sparks. A drawn card slides in, settles and glitters,
-  doubles shake the table, the seat to play breathes gold, its token calls for
-  attention when the turn arrives, and a won game ends under falling confetti
-  with fireworks over the winner. Dialogs rise into place, buttons sparkle under
-  the cursor without any particles, and every press glitters. All of it is read back from the game
-  state, so bots get the same show as a human.
-- An **animated main menu**: the card floats on the felt over a lamp that swells
-  and fades, the rule under the title breathes, the eight tokens bob in a row
-  while a light passes along them, gold dust drifts up and a sheen runs across
-  **NEW GAME**. A button answers the cursor by moving - it slides, its edge warms
-  from dim to gold, a rule grows under its label and the word grows with it - so
-  nothing on the menu throws particles at the mouse. It offers **NEW GAME**, **CONTINUE**
+  red and throws thirty sparks. A drawn card appears and glitters,
+  doubles shake the table, the seat to play glows gold and its token lights the
+  tile it stands on, and the end of the game is played as a ceremony. Nothing
+  that is being read ever moves: no tile, token, deed or dialog drifts on its
+  own, and a hovered button answers by growing rather than jumping. All of it is
+  read back from the game state, so bots get the same show as a human.
+- An **animated main menu**: the card sits on a lamp that swells and fades, the
+  eight tokens stand in a row while a light passes along them, gold dust drifts
+  up and a sheen runs across **NEW GAME**. A hovered button grows outwards from
+  its own centre, its edge warms from dim to gold, a rule grows under its label
+  and the word grows with it; in game the same button lifts towards the top
+  right instead, where the panels have room. Nothing on the menu moves by itself
+  and no button throws particles, either on hover or on a press. It offers **NEW GAME**, **CONTINUE**
   (the saved game) and the rules of the game; the language and sound switches sit
   in the corner. In game, the **MENU** button at the top of the log asks once and
   takes you back to it.
@@ -150,7 +151,9 @@ every seat be a bot and watch it play itself:
   itself in seconds instead of minutes. Because a turn then lasts a single frame,
   the whole show is paced down with it: a fifth of the particles, no screen
   shake, no flashes, no rings or fireworks, and one amount at a time instead of
-  a pile of numbers. Press it again to get the full show back.
+  a pile of numbers. The closing ceremony is the exception: it is the reward
+  for staying to the end, so it always plays at full strength. Press it again to
+  get the full show back.
 - **Renamable seats**: click a name on the setup screen and type - every player,
   human or bot, can be called whatever you like.
 - Animated token movement, hover tooltips on every tile, live game log.
@@ -214,7 +217,7 @@ end-of-game vote, the final ranking and the token picker.
 
 | Ending a game by agreement | The final ranking |
 | --- | --- |
-| ![The vote to end the game](docs/vote.png) | ![Game over, ranked by who lasted longest](docs/over.png) |
+| ![The vote to end the game](docs/vote.png) | ![The closing ceremony, with the crown and the final ranking](docs/over.png) |
 
 | Several saves, one picker | Hover any tile for its deed |
 | --- | --- |

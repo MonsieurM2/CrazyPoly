@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use macroquad::prelude::*;
 
 use crate::board::{Kind, Space};
-use crate::fx::{self, Fx};
+use crate::fx::Fx;
 use crate::game::{Game, Phase, TradeState, MAX_HOUSES};
 use crate::i18n;
 use crate::tokens;
@@ -198,11 +198,6 @@ fn inr(r: Rect, x: f32, y: f32) -> bool {
 }
 
 /// Overshoots slightly before settling on 1, for things that land.
-fn ease_out_back(x: f32) -> f32 {
-    let c1 = 1.70158;
-    let c3 = c1 + 1.0;
-    1.0 + c3 * (x - 1.0).powi(3) + c1 * (x - 1.0).powi(2)
-}
 
 fn money(v: i64) -> String {
     let sign = if v < 0 { "-" } else { "" };
@@ -400,10 +395,29 @@ fn button(hit: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let hover = enabled && inr(hit, mx, my);
     // The button answers the cursor by moving: it lifts, its edge warms and a
     // gold rule grows from the middle. No particles on hover.
-    let ease = if enabled { button_hover(label, hit, hover) } else { 0.0 };
-    let r = Rect::new(hit.x + ease * 6.0, hit.y - ease * 2.0, hit.w, hit.h);
+    // A small control may change its look, but it must not jump: the motion is
+    // scaled by the button's own size.
+    let weight = (hit.h / 54.0).clamp(0.30, 1.0);
+    let ease = if enabled { button_hover(label, hit, hover) * weight } else { 0.0 };
+    // In the menus the button grows, label and all; in game it only shifts, so
+    // a tight label never overruns its border.
+    let growing = BUTTON_MOVE.load(Ordering::Relaxed) == 0;
+    let r = if !growing {
+        Rect::new(hit.x + ease * 6.0, hit.y - ease * 2.0, hit.w, hit.h)
+    } else {
+        // Grows outwards from its centre, in every direction at once.
+        Rect::new(
+            hit.x - ease * 3.0,
+            hit.y - ease * 2.0,
+            hit.w + ease * 6.0,
+            hit.h + ease * 4.0,
+        )
+    };
     let radius = (r.h * 0.30).min(12.0);
-    let mut size = (r.h * 0.36).clamp(10.0, 16.0) * (1.0 + 0.045 * ease);
+    let mut size = (r.h * 0.36).clamp(10.0, 16.0);
+    if growing {
+        size *= 1.0 + 0.045 * ease;
+    }
     let label = if measure(label, size, true).width > r.w - 16.0 {
         while size > 9.5 && measure(label, size, true).width > r.w - 16.0 {
             size -= 0.5;
@@ -480,9 +494,6 @@ fn button(hit: Rect, label: &str, enabled: bool, primary: bool) -> bool {
     let clicked = enabled && hover && is_mouse_button_pressed(MouseButton::Left);
     if clicked {
         crate::audio::sfx(crate::audio::Sfx::Click);
-        if primary {
-            fx::queue_click(vec2(mx, my), true);
-        }
     }
     clicked
 }
@@ -617,6 +628,10 @@ fn sound_button(r: Rect, icon: Icon, on: bool) -> bool {
 /// How much of its size the open dialog has grown into this frame.
 static MODAL_SCALE: AtomicU32 = AtomicU32::new(0x3f80_0000);
 
+/// How a hovered button moves. Menus grow a button around its own centre; the
+/// game lifts it towards the top right, where the panels have room for it.
+static BUTTON_MOVE: AtomicU32 = AtomicU32::new(0);
+
 fn modal_rect(w: f32, h: f32) -> Rect {
     let w = w.min(screen_width() - 24.0);
     let h = h.min(screen_height() - 24.0);
@@ -700,6 +715,11 @@ pub struct Ui {
     /// rise into place instead of appearing.
     modal_now: Modal,
     modal_age: f32,
+    /// The closing ceremony: how long it has played, how many rows have been
+    /// revealed, and whether the winner has already been crowned.
+    over_age: f32,
+    over_rows: usize,
+    over_burst: bool,
 }
 
 impl Ui {
@@ -727,6 +747,9 @@ impl Ui {
             bid_age: 10.0,
             modal_now: Modal::None,
             modal_age: 10.0,
+            over_age: 0.0,
+            over_rows: 0,
+            over_burst: false,
         }
     }
 }
@@ -976,16 +999,15 @@ impl Watch {
             self.rain += dt;
             if self.rain > 1.1 {
                 self.rain = 0.0;
-                fx.rain(screen_width(), 26);
-                if !fast {
-                    // Fireworks over the winner's card.
-                    let at = vec2(
-                        macroquad::rand::gen_range(0.14, 0.86) * screen_width(),
-                        macroquad::rand::gen_range(0.12, 0.46) * screen_height(),
-                    );
-                    fx.burst(at, GOLD_SOFT);
-                    fx.rays(at, Color::new(0.99, 0.95, 0.84, 0.95), 12);
-                }
+                fx.rain(screen_width(), 16);
+                // Fireworks over the tableau: the ceremony plays in full even
+                // when the game itself was fast-forwarded.
+                let at = vec2(
+                    macroquad::rand::gen_range(0.14, 0.86) * screen_width(),
+                    macroquad::rand::gen_range(0.12, 0.46) * screen_height(),
+                );
+                fx.burst(at, GOLD_SOFT);
+                fx.rays(at, Color::new(0.99, 0.95, 0.84, 0.95), 12);
             }
         }
     }
@@ -1114,12 +1136,12 @@ pub fn frame(app: &mut App) {
             }
         }
     }
-    // Any press anywhere glitters at the cursor, and the effects advance once
-    // per frame for every screen.
-    if is_mouse_button_pressed(MouseButton::Left) {
-        let (mx, my) = mouse_position();
-        fx::queue_click(vec2(mx, my), false);
-    }
+    // Buttons answer the cursor where the layout allows it, and the effects
+    // advance once per frame for every screen.
+    BUTTON_MOVE.store(
+        if app.screen == Screen::Play { 1 } else { 0 },
+        Ordering::Relaxed,
+    );
     app.ui.fx.update(get_frame_time().min(0.05));
     match app.screen {
         Screen::Menu => draw_menu(app),
@@ -1293,8 +1315,7 @@ fn draw_setup(app: &mut App) {
     let w = 830.0_f32.min(sw - 32.0);
     let h = (374.0 + app.setup.count as f32 * 54.0).min(sh - 32.0);
     let x = (sw - w) * 0.5;
-    // The setup card floats like the menu card, so the two screens agree.
-    let y = (sh - h) * 0.5 + (get_time() as f32 * 0.85).sin() * 2.5;
+    let y = (sh - h) * 0.5;
     // While the token picker is open it owns every click.
     let picker_open = app.setup.token_slot.is_some() || app.ui.load_open || app.setup.board_picker;
 
@@ -1847,7 +1868,9 @@ fn draw_play(app: &mut App) {
     let Some(g) = game.as_mut() else {
         return;
     };
-    ui.fx.set_fast(g.fast);
+    // The victory screen is the reward: it plays at full strength even when the
+    // game itself was fast-forwarded.
+    ui.fx.set_fast(g.fast && g.phase != Phase::Over);
     let dt = get_frame_time().min(0.05);
     let lay = layout(ui.fx.offset());
     ui.watch.feed(g, &mut ui.fx, &lay.geo, dt);
@@ -1858,8 +1881,16 @@ fn draw_play(app: &mut App) {
     if modal != ui.modal_now {
         ui.modal_now = modal;
         ui.modal_age = 0.0;
+        if modal == Modal::Over {
+            ui.over_age = 0.0;
+            ui.over_rows = 0;
+            ui.over_burst = false;
+        }
     } else {
         ui.modal_age += dt;
+        if modal == Modal::Over {
+            ui.over_age += dt;
+        }
     }
     let grow = (ui.modal_age / 0.20).min(1.0);
     let grow = 1.0 - (1.0 - grow).powi(3);
@@ -1889,14 +1920,14 @@ fn draw_play(app: &mut App) {
         centered_bold(text, x, y, size, color);
     });
 
-    let mut again = false;
+    let mut over = OverAction::Nothing;
     match modal {
         Modal::None | Modal::Waiting => {}
         Modal::Assets => draw_assets(g, ui, &lay),
         Modal::Trade => draw_trade(g, ui),
         Modal::Auction => draw_auction(g, ui),
         Modal::Debt => draw_debt(g, ui),
-        Modal::Over => again = draw_over(g),
+        Modal::Over => over = draw_over(g, ui),
         Modal::Rules => draw_rules(ui),
         Modal::Vote => draw_vote(g, ui),
         Modal::Pause => draw_pause(g, ui),
@@ -1910,9 +1941,17 @@ fn draw_play(app: &mut App) {
         }
     }
     ui.fx.draw_flash();
-    if again {
-        *game = None;
-        *screen = Screen::Setup;
+    match over {
+        OverAction::Again => {
+            *game = None;
+            *screen = Screen::Setup;
+        }
+        OverAction::Menu => {
+            *game = None;
+            *ui = Ui::new();
+            *screen = Screen::Menu;
+        }
+        OverAction::Nothing => {}
     }
 }
 
@@ -2333,9 +2372,16 @@ fn draw_tokens(g: &Game, geo: &Geo) {
                 cy -= (anim.t * std::f32::consts::PI).sin() * r.h * 0.35;
             }
         } else if i == g.turn && g.phase != Phase::Over {
-            // The player to move breathes, just enough to be seen.
+            // The player to move glows where it stands: a token is a piece on
+            // the board, it does not drift while someone is reading it.
             let t = get_time() as f32;
-            cy -= 1.2 + 1.2 * (t * 2.4).sin();
+            let glow = 0.5 + 0.5 * (t * 2.2).sin();
+            draw_circle(
+                cx,
+                cy,
+                (r.w * 0.22).clamp(10.0, 18.0),
+                Color::new(player.color.r, player.color.g, player.color.b, 0.10 + 0.14 * glow),
+            );
         }
         // Round chip with the player's token drawn in white on it.
         let radius = (r.w * 0.165).clamp(8.0, 14.0);
@@ -2393,10 +2439,9 @@ fn draw_center(g: &Game, geo: &Geo) {
         let bcard_w = c.w * 0.76;
         let bcard_h = c.h * 0.22;
         let bx = c.x + (c.w - bcard_w) * 0.5;
-        // The card lands: it drops in fast and settles with a small overshoot.
-        let age = (5.0 - left).clamp(0.0, 1.0);
-        let settle = ease_out_back((age / 0.30).min(1.0));
-        let by2 = c.y + c.h - bcard_h - c.h * 0.02 + (1.0 - settle) * bcard_h * 0.9;
+        let _ = left;
+        // The card appears where it belongs: a card being read must not move.
+        let by2 = c.y + c.h - bcard_h - c.h * 0.02;
         draw_rectangle(bx + 3.0, by2 + 5.0, bcard_w, bcard_h, Color { r: 0.0, g: 0.0, b: 0.0, a: 0.16 });
         draw_rectangle(bx, by2, bcard_w, bcard_h, TILE);
         draw_rectangle_lines(bx, by2, bcard_w, bcard_h, 1.5, GOLD);
@@ -3000,7 +3045,7 @@ fn draw_deed_card(g: &Game, lay: &Layout) {
         g,
         tile,
         geo.x + geo.s * 0.105,
-        geo.y + geo.s * 0.195 + (get_time() as f32 * 2.0).sin() * 4.0,
+        geo.y + geo.s * 0.195,
         (geo.s * 0.31).max(150.0),
         (geo.s * 0.40).max(180.0),
     );
@@ -3178,7 +3223,8 @@ fn draw_auction(g: &mut Game, ui: &mut Ui) {
         ui.bid_age = 0.0;
     }
     ui.bid_age += get_frame_time();
-    let bump = 1.0 + 0.30 * (1.0 - (ui.bid_age / 0.30).min(1.0)).powi(2);
+    // The bid flashes gold when it moves; the number itself keeps its size.
+    let heat = 1.0 - (ui.bid_age / 0.35).min(1.0);
 
     let r = modal_rect(600.0, 550.0);
     let content = modal_shell(r, i18n::t("AUCTION", "ENCHÈRES"));
@@ -3197,8 +3243,13 @@ fn draw_auction(g: &mut Game, ui: &mut Ui) {
         &money(bid),
         r.x + r.w * 0.5,
         content.y + 122.0,
-        34.0 * bump,
-        if bid > 0 { ACCENT } else { TEXT_DIM },
+        34.0,
+        if bid > 0 {
+            let base = if bid > 0 { ACCENT } else { TEXT_DIM };
+            mix(base, GOLD_SOFT, heat * 0.8)
+        } else {
+            TEXT_DIM
+        },
     );
 
     let mut y = content.y + 168.0;
@@ -3766,65 +3817,337 @@ fn draw_trade_editor(g: &mut Game) {
     }
 }
 
-fn draw_over(g: &mut Game) -> bool {
-    let r = modal_rect(660.0, 640.0);
-    let content = modal_shell(r, i18n::t("GAME OVER", "PARTIE TERMINÉE"));
-    let order = g.standings();
-
-    if let Some(w) = g.winner {
-        centered(i18n::t("WINNER", "VAINQUEUR"), r.x + r.w * 0.5, content.y + 16.0, 12.0, MUTED);
-        centered_bold(&g.players[w].name, r.x + r.w * 0.5, content.y + 48.0, 36.0, g.players[w].color);
-        centered(
-            &format!("{} {}", i18n::t("Net worth", "Patrimoine"), money(g.net_worth(w))),
-            r.x + r.w * 0.5,
-            content.y + 78.0,
-            14.0,
-            TEXT_DIM,
-        );
-    }
-
-    let mut y = content.y + 112.0;
-    txt_bold(i18n::t("STANDINGS", "CLASSEMENT"), r.x + 30.0, y, 11.0, MUTED);
-    y += 12.0;
-    for (rank, i) in order.iter().enumerate() {
-        let row = Rect::new(r.x + 28.0, y, r.w - 56.0, 38.0);
-        draw_rectangle(row.x, row.y, row.w, row.h, ROW_BG);
-        draw_circle(row.x + 19.0, row.y + 19.0, 9.0, g.players[*i].color);
-        centered_bold(&(rank + 1).to_string(), row.x + 19.0, row.y + 19.0, 10.0, WHITE);
-        txt_bold(
-            &truncate(&g.players[*i].name, row.w - 260.0, 13.5),
-            row.x + 38.0,
-            row.y + 24.0,
-            13.5,
-            if g.players[*i].bankrupt { MUTED } else { TEXT },
-        );
-        let right = if g.players[*i].bankrupt {
-            i18n::t("bankrupt", "en faillite").to_string()
-        } else {
-            money(g.net_worth(*i))
-        };
-        text_r(
-            &right,
-            row.x + row.w - 12.0,
-            row.y + 24.0,
-            12.0,
-            if g.players[*i].bankrupt { MUTED } else { TEXT_DIM },
-        );
-        y += 42.0;
-    }
-
-    if button(
-        Rect::new(r.x + r.w * 0.5 - 120.0, r.y + r.h - 66.0, 240.0, 46.0),
-        i18n::t("PLAY AGAIN", "REJOUER"),
-        true,
-        true,
-    ) {
-        return true;
-    }
-    false
+/// What the closing ceremony asks the table to do next.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum OverAction {
+    Nothing,
+    Again,
+    Menu,
 }
 
+/// A reveal: 0 before it starts, eased to 1 once it has played.
+fn reveal(age: f32, start: f32, dur: f32) -> f32 {
+    let x = ((age - start) / dur).clamp(0.0, 1.0);
+    1.0 - (1.0 - x).powi(3)
+}
 
+fn fade(color: Color, a: f32) -> Color {
+    Color::new(color.r, color.g, color.b, color.a * a)
+}
+
+/// The crown of the winner, from primitives: a band, three points, three gems.
+fn draw_crown(cx: f32, cy: f32, w: f32, color: Color) {
+    let h = w * 0.52;
+    for k in 0..3 {
+        let px = cx + w * (-0.40 + 0.40 * k as f32);
+        draw_triangle(
+            vec2(px - w * 0.14, cy + h * 0.18),
+            vec2(px + w * 0.14, cy + h * 0.18),
+            vec2(px, cy - h * 0.58),
+            color,
+        );
+        draw_circle(px, cy - h * 0.56, w * 0.035, color);
+    }
+    round_rect(cx - w * 0.5, cy + h * 0.10, w, h * 0.34, 2.0, color);
+    for k in 1..4 {
+        let px = cx + w * (-0.5 + 0.25 * k as f32);
+        draw_circle(
+            px,
+            cy + h * 0.27,
+            w * 0.038,
+            Color::new(0.42, 0.075, 0.12, color.a),
+        );
+    }
+}
+
+/// The end of the game, played as a ceremony: the table darkens, a slow wheel
+/// of gold turns behind the winner, a crown is set, the ranking is revealed row
+/// by row with a spark each time, and the amounts count up to their final value.
+fn draw_over(g: &Game, ui: &mut Ui) -> OverAction {
+    let sw = screen_width();
+    let sh = screen_height();
+    let cx = sw * 0.5;
+    let age = ui.over_age;
+    let t = get_time() as f32;
+    let order = g.standings();
+
+    // The curtain: the felt shows through only as a memory of the table.
+    draw_rectangle(
+        0.0,
+        0.0,
+        sw,
+        sh,
+        Color { r: 0.008, g: 0.028, b: 0.021, a: 0.93 },
+    );
+    draw_rectangle(
+        0.0,
+        0.0,
+        sw,
+        sh,
+        Color { r: BG_DEEP.r, g: BG_DEEP.g, b: BG_DEEP.b, a: 0.90 },
+    );
+    // A gilt frame closes the tableau, like the lid of the box.
+    draw_rectangle_lines(
+        18.0,
+        18.0,
+        sw - 36.0,
+        sh - 36.0,
+        1.5,
+        Color { r: 0.945, g: 0.835, b: 0.588, a: 0.22 },
+    );
+    draw_rectangle_lines(
+        25.0,
+        25.0,
+        sw - 50.0,
+        sh - 50.0,
+        1.0,
+        Color { r: 0.945, g: 0.835, b: 0.588, a: 0.10 },
+    );
+    // A curtain of shadow at the top and the bottom, to frame the tableau.
+    for k in 0..24 {
+        let a = 0.020 * (1.0 - k as f32 / 24.0);
+        draw_rectangle(0.0, k as f32 * 8.0, sw, 9.0, Color { r: 0.0, g: 0.0, b: 0.0, a: a * 3.0 });
+        draw_rectangle(
+            0.0,
+            sh - (k as f32 + 1.0) * 8.0,
+            sw,
+            9.0,
+            Color { r: 0.0, g: 0.0, b: 0.0, a: a * 3.0 },
+        );
+    }
+
+    // The celebration plays above the curtain but under the words: rain,
+    // confetti and fireworks belong to the backdrop of the ceremony.
+    ui.fx.draw();
+
+    let spot = vec2(cx, sh * 0.21);
+    // A wheel of gold light, turning slowly behind the winner.
+    for k in 0..44 {
+        let a = t * 0.10 + k as f32 * std::f32::consts::TAU / 44.0;
+        let len = sw * (0.26 + 0.10 * ((k % 4) as f32));
+        let end = spot + vec2(a.cos(), a.sin() * 0.72) * len;
+        let breathe = 0.5 + 0.5 * (t * 0.8 + k as f32 * 0.7).sin();
+        draw_line(
+            spot.x,
+            spot.y,
+            end.x,
+            end.y,
+            1.5,
+            Color {
+                r: 0.945,
+                g: 0.835,
+                b: 0.588,
+                a: 0.024 + 0.026 * breathe,
+            },
+        );
+    }
+    for k in (1..=7).rev() {
+        draw_circle(
+            spot.x,
+            spot.y,
+            34.0 + k as f32 * 16.0,
+            Color { r: 0.945, g: 0.835, b: 0.588, a: 0.010 },
+        );
+    }
+
+    // The title of the ceremony.
+    let head = reveal(age, 0.0, 0.5);
+    spaced_center(
+        i18n::t("GAME OVER", "PARTIE TERMINÉE"),
+        cx,
+        34.0,
+        12.0,
+        4.2,
+        fade(MUTED, head),
+    );
+    let line = sw * (0.10 + 0.06 * age.min(1.0));
+    draw_line(cx - line, 52.0, cx + line, 52.0, 1.0, fade(GOLD_DIM, head));
+
+    let disc = vec2(cx, sh * 0.21);
+    if let Some(w) = g.winner {
+        let player = &g.players[w];
+        let a = reveal(age, 0.10, 0.55);
+        if a > 0.0 {
+            let pulse = 0.5 + 0.5 * (t * 1.6).sin();
+            draw_circle(
+                disc.x,
+                disc.y,
+                92.0,
+                fade(Color::new(0.945, 0.835, 0.588, 0.05), a * (0.5 + 0.5 * pulse)),
+            );
+            draw_circle(
+                disc.x + 3.0,
+                disc.y + 5.0,
+                46.0,
+                Color { r: 0.0, g: 0.0, b: 0.0, a: 0.30 * a },
+            );
+            draw_circle(disc.x, disc.y, 46.0, fade(player.color, a));
+            draw_circle_lines(disc.x, disc.y, 46.0, 2.2, fade(GOLD_SOFT, a));
+            tokens::draw(player.token, fade(WHITE, a), disc.x, disc.y, 30.0);
+            draw_crown(
+                disc.x,
+                disc.y - 78.0,
+                58.0,
+                fade(Color::new(0.98, 0.86, 0.45, 1.0), a),
+            );
+
+            let name_a = reveal(age, 0.28, 0.5);
+            serif_center(
+                &player.name,
+                cx,
+                disc.y + 96.0,
+                46.0,
+                fade(mix(player.color, CREAM, 0.45), name_a),
+            );
+            let worth = (g.net_worth(w) as f32 * reveal(age, 0.35, 1.0)) as i64;
+            centered_bold(
+                &format!("{}  {}", i18n::t("NET WORTH", "PATRIMOINE"), money(worth)),
+                cx,
+                disc.y + 128.0,
+                15.0,
+                fade(GOLD_SOFT, reveal(age, 0.40, 0.5)),
+            );
+
+            // The crown lands: one great burst, then confetti over the tableau.
+            if !ui.over_burst && age > 0.16 {
+                ui.over_burst = true;
+                ui.fx.burst(disc, GOLD_SOFT);
+                ui.fx.rays(disc, GOLD_SOFT, 16);
+                ui.fx.confetti(vec2(cx, disc.y - 40.0), 46);
+                ui.fx.shake(4.0);
+            }
+        }
+    }
+
+    if g.winner.is_none() {
+        let a = reveal(age, 0.10, 0.55);
+        serif_center(
+            i18n::t("THE TABLE AGREED", "LA TABLE A DÉCIDÉ"),
+            cx,
+            sh * 0.19,
+            34.0,
+            fade(CREAM, a),
+        );
+    }
+
+    // The ranking, revealed one row at a time.
+    let title_a = reveal(age, 0.50, 0.4);
+    spaced_center(
+        i18n::t("FINAL STANDING", "CLASSEMENT FINAL"),
+        cx,
+        sh * 0.475,
+        10.0,
+        3.4,
+        fade(CREAM_DIM, title_a),
+    );
+    let row_w = (sw * 0.52).clamp(420.0, 700.0);
+    let rows_top = sh * 0.505;
+    let gap = 6.0;
+    let room = (sh - 132.0 - rows_top).max(60.0);
+    let row_h = (room / order.len().max(1) as f32 - gap).clamp(26.0, 42.0);
+    let first = 0.58;
+    let step = 0.13;
+
+    let started = (((age - first) / step).ceil()).max(0.0) as usize;
+    while ui.over_rows < started.min(order.len()) {
+        let idx = ui.over_rows;
+        let at = vec2(cx - row_w * 0.5 + 26.0, rows_top + (row_h + gap) * idx as f32 + row_h * 0.5);
+        ui.fx.stars(at, GOLD_SOFT, 7);
+        ui.fx.ring(at, GOLD_SOFT, 4.0, 32.0, 0.34);
+        ui.over_rows += 1;
+    }
+
+    for (rank, i) in order.iter().enumerate() {
+        let a = reveal(age, first + step * rank as f32, 0.28);
+        if a <= 0.0 {
+            continue;
+        }
+        let player = &g.players[*i];
+        let y = rows_top + (row_h + gap) * rank as f32;
+        let row = Rect::new(cx - row_w * 0.5, y, row_w, row_h);
+        let medal = match rank {
+            0 => Color::new(0.98, 0.83, 0.38, 1.0),
+            1 => Color::new(0.83, 0.86, 0.89, 1.0),
+            2 => Color::new(0.80, 0.52, 0.30, 1.0),
+            _ => Color::new(0.30, 0.44, 0.36, 1.0),
+        };
+        round_rect(
+            row.x,
+            row.y,
+            row.w,
+            row.h,
+            9.0,
+            Color { r: 0.043, g: 0.125, b: 0.094, a: 0.94 * a },
+        );
+        round_outline(
+            row.x,
+            row.y,
+            row.w,
+            row.h,
+            9.0,
+            1.1,
+            fade(if rank == 0 { GOLD } else { CARD_EDGE }, a),
+        );
+        draw_circle(row.x + 26.0, row.y + row_h * 0.5, 13.0, fade(medal, a));
+        centered_bold(
+            &(rank + 1).to_string(),
+            row.x + 26.0,
+            row.y + row_h * 0.5,
+            12.0,
+            fade(Color::new(0.05, 0.10, 0.07, 1.0), a),
+        );
+        draw_circle(row.x + 54.0, row.y + row_h * 0.5, 11.0, fade(player.color, a));
+        tokens::draw(
+            player.token,
+            fade(WHITE, a),
+            row.x + 54.0,
+            row.y + row_h * 0.5,
+            7.5,
+        );
+        txt_bold(
+            &truncate(&player.name, row.w - 300.0, 14.0),
+            row.x + 74.0,
+            row.y + row_h * 0.5 + 5.0,
+            14.0,
+            fade(if player.bankrupt { MUTED } else { TEXT }, a),
+        );
+        let lots = g.props.iter().filter(|p| p.owner == Some(*i)).count();
+        let detail = if player.bankrupt {
+            i18n::t("bankrupt", "en faillite").to_string()
+        } else {
+            format!("{} {}", lots, i18n::t("lots", "lots"))
+        };
+        text_r(
+            &detail,
+            row.x + row.w - 130.0,
+            row.y + row_h * 0.5 + 5.0,
+            12.0,
+            fade(TEXT_DIM, a),
+        );
+        let worth = (g.net_worth(*i) as f32 * reveal(age, first + step * rank as f32, 0.8)) as i64;
+        text_r_bold(
+            &money(worth),
+            row.x + row.w - 16.0,
+            row.y + row_h * 0.5 + 6.0,
+            16.0,
+            fade(if rank == 0 { GOLD_SOFT } else { TEXT_DIM }, a),
+        );
+    }
+
+    // The two ways out, offered once the whole ranking is on the table.
+    let buttons_at = first + step * order.len() as f32 + 0.28;
+    let a = reveal(age, buttons_at, 0.35);
+    if a > 0.45 {
+        let y = sh - 86.0;
+        if button(Rect::new(cx - 236.0, y, 220.0, 52.0), i18n::t("PLAY AGAIN", "REJOUER"), true, true) {
+            return OverAction::Again;
+        }
+        if button(Rect::new(cx + 16.0, y, 220.0, 52.0), i18n::t("MAIN MENU", "MENU PRINCIPAL"), true, false) {
+            return OverAction::Menu;
+        }
+    }
+    OverAction::Nothing
+}
 
 // ------------------------------------------------------------ menu & dialogs
 
@@ -4118,9 +4441,8 @@ fn draw_menu(app: &mut App) {
         3.2,
         CREAM_DIM,
     );
-    // The rule under the title breathes out and in, like a measured beat.
-    let beat = (t * 0.55).sin() * 0.5 + 0.5;
-    let half = sw * (0.050 + 0.038 * beat);
+    // A still rule under the title, with a dot at each end.
+    let half = sw * 0.070;
     draw_line(cx - half, sh * 0.292, cx + half, sh * 0.292, 1.4, GOLD_DIM);
     for side in [-1.0, 1.0] {
         draw_circle(cx + side * half, sh * 0.292, 2.0, GOLD_SOFT);
@@ -4131,8 +4453,8 @@ fn draw_menu(app: &mut App) {
     let gap = 12.0;
     let card_h = 3.0 * bh + 2.0 * gap + 36.0;
     let x = cx - w * 0.5;
-    // The card floats over the felt on a slow breath.
-    let y = sh * 0.372 + (t * 0.85).sin() * 3.0;
+    // The card sits still: a menu must not slide under the cursor.
+    let y = sh * 0.372;
     // A lamp behind the card: a wide, soft glow that swells and fades.
     let lamp = (t * 0.7).sin() * 0.5 + 0.5;
     draw_ellipse(
@@ -4208,27 +4530,25 @@ fn draw_menu(app: &mut App) {
         px += 2.0;
     }
 
-    // The eight tokens, bobbing on the table while a light passes over them.
+    // The eight tokens stand still on the table while a light passes over them.
     let step = (sw * 0.05).clamp(46.0, 66.0);
     let start = cx - step * 3.5;
-    let sway = (t * 0.45).sin() * 7.0;
     let wave = ((t * 0.5) % 1.0) * (TOKENS.len() as f32 + 2.4) - 1.2;
     for k in 0..TOKENS.len() {
-        let phase = t * 1.7 + k as f32 * 0.85;
         let near = (1.0 - (k as f32 - wave).abs() * 0.6).max(0.0);
-        let tx = start + step * k as f32 + sway;
-        let ty = y + card_h + 54.0 + phase.sin() * 5.0 - near * 7.0;
+        let tx = start + step * k as f32;
+        let ty = y + card_h + 54.0;
         draw_circle(
             tx,
             ty + 11.0,
             step * 0.30,
-            Color { r: 0.0, g: 0.0, b: 0.0, a: 0.18 + 0.08 * near },
+            Color { r: 0.0, g: 0.0, b: 0.0, a: 0.18 },
         );
-        let halo = 0.07 + 0.06 * (phase.cos() * 0.5 + 0.5) + 0.13 * near;
+        let halo = 0.07 + 0.16 * near;
         draw_circle(
             tx,
             ty,
-            step * (0.37 + 0.09 * near),
+            step * 0.37,
             Color { r: TOKENS[k].r, g: TOKENS[k].g, b: TOKENS[k].b, a: halo },
         );
         tokens::draw(k, TOKENS[k], tx, ty, step * 0.30);

@@ -5,8 +5,6 @@
 //! this module keeps them alive, moves them and draws them; nothing here can
 //! change the rules of the game.
 
-use std::cell::RefCell;
-
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
 
@@ -421,17 +419,6 @@ impl Fx {
         }
         self.labels.retain(|l| l.life > 0.0);
 
-        // Presses and hovers ask for their spark from inside the drawing code;
-        // they are collected here, so any button anywhere can light up.
-        let queued: Vec<(Vec2, bool)> = CLICKS.with(|q| q.borrow_mut().drain(..).collect());
-        for (at, big) in queued {
-            if big {
-                self.ring(at, Color::new(0.98, 0.91, 0.72, 0.95), 3.0, 36.0, 0.36);
-                self.spark(at, Color::new(0.99, 0.93, 0.75, 1.0), 10);
-            } else {
-                self.stars(at, Color::new(0.98, 0.90, 0.66, 0.9), 2);
-            }
-        }
     }
 
     /// How far the table is displaced this frame.
@@ -549,16 +536,6 @@ impl Fx {
             Color::new(self.flash.r, self.flash.g, self.flash.b, self.flash_a.min(0.5)),
         );
     }
-}
-
-// Press sparks asked for by the drawing code.
-thread_local! {
-    static CLICKS: RefCell<Vec<(Vec2, bool)>> = const { RefCell::new(Vec::new()) };
-}
-
-/// A button was pressed here: a ring and a burst on the next frame.
-pub fn queue_click(at: Vec2, big: bool) {
-    CLICKS.with(|q| q.borrow_mut().push((at, big)));
 }
 
 #[cfg(test)]
